@@ -1,11 +1,7 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  
-  root: "ishop-project",
-
-  build: {
-    
+   build: {
     outDir: "../dist",
     emptyOutDir: true,
   },
