@@ -136,7 +136,7 @@ $(function () {
   $("#btnNavRegister")
     .off("click")
     .on("click", function () {
-      $.ajax({ method: "GET", url: "register.html" }).then(function (html) {
+      $.ajax({ method: "GET", url: "/register.html" }).then(function (html) {
         $("#bodyContainer").html(html);
 
         $("#btnRegister")
@@ -164,7 +164,7 @@ $(function () {
             })
               .then(function () {
                 alert("Register Successfully..");
-                $.ajax({ method: "GET", url: "login.html" }).then(function (
+                $.ajax({ method: "GET", url: "/login.html" }).then(function (
                   resp
                 ) {
                   $("#bodyContainer").html(resp);
@@ -213,7 +213,7 @@ $(function () {
               if (typeof onSuccess === "function") {
                 onSuccess();
               } else {
-                $.ajax({ method: "GET", url: "shophome.html" }).then(function (
+                $.ajax({ method: "GET", url: "/shophome.html" }).then(function (
                   resp
                 ) {
                   $("#bodyContainer").html(resp);
@@ -237,7 +237,7 @@ $(function () {
   $("#btnNavLogin")
     .off("click")
     .on("click", function () {
-      $.ajax({ method: "GET", url: "login.html" })
+      $.ajax({ method: "GET", url: "/login.html" })
         .then(function (resp) {
           $("#bodyContainer").html(resp);
           attachLoginHandler();
@@ -274,7 +274,7 @@ $(function () {
       $("#user").text("");
       $("#btnSignout").text("Login");
 
-      $.ajax({ method: "GET", url: "login.html" })
+      $.ajax({ method: "GET", url: "/login.html" })
         .then(function (resp) {
           $("#bodyContainer").html(resp);
           attachLoginHandler();
@@ -293,10 +293,10 @@ $(function () {
     .on("click", function () {
       if (!getCurrentUserId()) {
         // not logged in → first login
-        $.ajax({ method: "GET", url: "login.html" }).then(function (resp) {
+        $.ajax({ method: "GET", url: "/login.html" }).then(function (resp) {
           $("#bodyContainer").html(resp);
           attachLoginHandler(function () {
-            $.ajax({ method: "GET", url: "products.html" }).then(function (
+            $.ajax({ method: "GET", url: "/products.html" }).then(function (
               resp2
             ) {
               $("#bodyContainer").html(resp2);
@@ -306,7 +306,7 @@ $(function () {
         });
       } else {
         // already logged in → directly open products
-        $.ajax({ method: "GET", url: "products.html" }).then(function (resp) {
+        $.ajax({ method: "GET", url: "/products.html" }).then(function (resp) {
           $("#bodyContainer").html(resp);
           getProducts();
         });
@@ -320,25 +320,25 @@ $(function () {
   $("#btnNavCategories")
     .off("click")
     .on("click", function () {
-      if (!getCurrentUserId()) {
-        $.ajax({ method: "GET", url: "login.html" }).then(function (resp) {
-          $("#bodyContainer").html(resp);
-          attachLoginHandler(function () {
-            $.ajax({ method: "GET", url: "categories.html" }).then(function (
-              resp2
-            ) {
-              $("#bodyContainer").html(resp2);
-              getCategories();
-            });
+    if (!getCurrentUserId()) {
+      $.ajax({ method: "GET", url: "/login.html" }).then(function (resp) {
+        $("#bodyContainer").html(resp);
+        attachLoginHandler(function () {
+          $.ajax({ method: "GET", url: "/categories.html" }).then(function (
+            resp2
+          ) {
+            $("#bodyContainer").html(resp2);
+            getCategories();
           });
         });
-      } else {
-        $.ajax({ method: "GET", url: "categories.html" }).then(function (resp) {
-          $("#bodyContainer").html(resp);
-          getCategories();
-        });
-      }
-    });
+      });
+    } else {
+      $.ajax({ method: "GET", url: "/categories.html" }).then(function (resp) {
+        $("#bodyContainer").html(resp);
+        getCategories();
+      });
+    }
+  });
 
   // (Optional) footer shortcut – safe even if element not present
   $("#navCategoriesFooter")
@@ -519,7 +519,7 @@ $(function () {
         $("#btnContinue")
           .off("click")
           .on("click", function () {
-            $.ajax({ method: "GET", url: "products.html" }).then(function (
+            $.ajax({ method: "GET", url: "/products.html" }).then(function (
               resp
             ) {
               $("#bodyContainer").html(resp);
@@ -642,7 +642,7 @@ $(function () {
                   .off("click")
                   .on("click", function (e) {
                     e.preventDefault();
-                    $.ajax({ method: "GET", url: "products.html" }).then(
+                    $.ajax({ method: "GET", url: "/products.html" }).then(
                       function (resp) {
                         $("#bodyContainer").html(resp);
                         getProducts();
@@ -779,7 +779,7 @@ $(function () {
           .off("click", ".card")
           .on("click", ".card", function () {
             const categoryName = $(this).data("name");
-            $.ajax({ method: "GET", url: "products.html" }).then(function (
+            $.ajax({ method: "GET", url: "/products.html" }).then(function (
               resp
             ) {
               $("#bodyContainer").html(resp);
@@ -878,7 +878,7 @@ $(function () {
         $("#btnBackToCatalog")
           .off("click")
           .on("click", function () {
-            $.ajax({ method: "GET", url: "products.html" }).then(function (
+            $.ajax({ method: "GET", url: "/products.html" }).then(function (
               resp
             ) {
               $("#bodyContainer").html(resp);
