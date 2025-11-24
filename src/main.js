@@ -7,6 +7,9 @@ const API_BASE =
   "https://shopping-backend-jb5p.onrender.com";
 
 $(function () {
+  // Last loaded products (for search + sort)
+  let currentProducts = [];
+
   /* =========================
    * Helpers
    * ======================= */
@@ -320,25 +323,27 @@ $(function () {
   $("#btnNavCategories")
     .off("click")
     .on("click", function () {
-    if (!getCurrentUserId()) {
-      $.ajax({ method: "GET", url: "/login.html" }).then(function (resp) {
-        $("#bodyContainer").html(resp);
-        attachLoginHandler(function () {
-          $.ajax({ method: "GET", url: "/categories.html" }).then(function (
-            resp2
-          ) {
-            $("#bodyContainer").html(resp2);
-            getCategories();
+      if (!getCurrentUserId()) {
+        $.ajax({ method: "GET", url: "/login.html" }).then(function (resp) {
+          $("#bodyContainer").html(resp);
+          attachLoginHandler(function () {
+            $.ajax({ method: "GET", url: "/categories.html" }).then(function (
+              resp2
+            ) {
+              $("#bodyContainer").html(resp2);
+              getCategories();
+            });
           });
         });
-      });
-    } else {
-      $.ajax({ method: "GET", url: "/categories.html" }).then(function (resp) {
-        $("#bodyContainer").html(resp);
-        getCategories();
-      });
-    }
-  });
+      } else {
+        $.ajax({ method: "GET", url: "/categories.html" }).then(function (
+          resp
+        ) {
+          $("#bodyContainer").html(resp);
+          getCategories();
+        });
+      }
+    });
 
   // (Optional) footer shortcut – safe even if element not present
   $("#navCategoriesFooter")
@@ -346,6 +351,21 @@ $(function () {
     .on("click", function (e) {
       e.preventDefault();
       $("#btnNavCategories").click();
+    });
+
+  // Footer links for Shop / Register (if present)
+  $("#navShopF")
+    .off("click")
+    .on("click", function (e) {
+      e.preventDefault();
+      $("#btnNavShopping").click();
+    });
+
+  $("#navRegisterF")
+    .off("click")
+    .on("click", function (e) {
+      e.preventDefault();
+      $("#btnNavRegister").click();
     });
 
   /* =========================
@@ -680,8 +700,103 @@ $(function () {
 
   /* =========================
    * Products + Categories
+   * (with search + sort)
    * ======================= */
 
+  // Render products list into #productCatalog
+  function renderProducts(list) {
+    $("#productCatalog").empty();
+
+    if (!Array.isArray(list) || !list.length) {
+      $("#productCatalog").html('<p class="p-3">No products found.</p>');
+      return;
+    }
+
+    list.forEach(function (value) {
+      const title = value.title || "No title";
+      const img = fixImageUrl(value.image || "");
+      const price = value.price ? "₹" + value.price : "";
+      const idVal =
+        value.id !== undefined
+          ? String(value.id)
+          : value._id
+          ? String(value._id)
+          : "";
+
+      var card =
+        '<div class="card m-2 p-2 product-card" ' +
+        'style="width:200px;cursor:pointer;" ' +
+        'data-id="' +
+        idVal +
+        '">' +
+        '<img src="' +
+        img +
+        '" class="card-img-top" height="150" alt="' +
+        title +
+        '">' +
+        '<div class="card-body">' +
+        '<h6 class="card-title small">' +
+        title +
+        "</h6>" +
+        '<p class="card-text small text-muted">' +
+        price +
+        "</p>" +
+        "</div>" +
+        "</div>";
+
+      $("#productCatalog").append(card);
+    });
+  }
+
+  // Apply search + sort on currentProducts
+  function applyFilters() {
+    if (!Array.isArray(currentProducts)) {
+      currentProducts = [];
+    }
+
+    let filtered = currentProducts.slice();
+
+    const search = ($("#txtSearch").val() || "").toLowerCase().trim();
+    const sort = $("#ddlSort").val();
+
+    if (search) {
+      filtered = filtered.filter(function (p) {
+        const name = (p.title || "").toLowerCase();
+        const desc = (p.description || "").toLowerCase();
+        return name.includes(search) || desc.includes(search);
+      });
+    }
+
+    if (sort === "price-asc" || sort === "price-desc") {
+      filtered.sort(function (a, b) {
+        const pa = Number(a.price || 0);
+        const pb = Number(b.price || 0);
+        return sort === "price-asc" ? pa - pb : pb - pa;
+      });
+    } else if (sort === "title-asc" || sort === "title-desc") {
+      filtered.sort(function (a, b) {
+        const ta = (a.title || "").toLowerCase();
+        const tb = (b.title || "").toLowerCase();
+        if (ta < tb) return sort === "title-asc" ? -1 : 1;
+        if (ta > tb) return sort === "title-asc" ? 1 : -1;
+        return 0;
+      });
+    }
+
+    renderProducts(filtered);
+  }
+
+  // Bind input events (ensure only once)
+  function bindProductFilters() {
+    if ($("#txtSearch").length) {
+      $("#txtSearch").off("input").on("input", applyFilters);
+    }
+    if ($("#ddlSort").length) {
+      $("#ddlSort").off("change").on("change", applyFilters);
+    }
+  }
+
+  // Load products (optionally by category)
   function getProducts(categoryName) {
     var url = API_BASE + "/getproducts";
     if (categoryName) {
@@ -690,48 +805,15 @@ $(function () {
 
     $.ajax({ method: "GET", url: url })
       .then(function (response) {
-        $("#productCatalog").empty();
+        currentProducts = Array.isArray(response) ? response : [];
 
-        if (!Array.isArray(response) || !response.length) {
-          $("#productCatalog").html('<p class="p-3">No products found.</p>');
-          return;
-        }
+        // search + sort handlers attach
+        bindProductFilters();
 
-        response.forEach(function (value) {
-          const title = value.title || "No title";
-          const img = fixImageUrl(value.image || "");
-          const price = value.price ? "₹" + value.price : "";
-          const idVal =
-            value.id !== undefined
-              ? String(value.id)
-              : value._id
-              ? String(value._id)
-              : "";
+        // first render with current filters (if any)
+        applyFilters();
 
-          var card =
-            '<div class="card m-2 p-2 product-card" ' +
-            'style="width:200px;cursor:pointer;" ' +
-            'data-id="' +
-            idVal +
-            '">' +
-            '<img src="' +
-            img +
-            '" class="card-img-top" height="150" alt="' +
-            title +
-            '">' +
-            '<div class="card-body">' +
-            '<h6 class="card-title small">' +
-            title +
-            "</h6>" +
-            '<p class="card-text small text-muted">' +
-            price +
-            "</p>" +
-            "</div>" +
-            "</div>";
-
-          $("#productCatalog").append(card);
-        });
-
+        // Product detail click handler
         $("#productCatalog")
           .off("click", ".product-card")
           .on("click", ".product-card", function () {
