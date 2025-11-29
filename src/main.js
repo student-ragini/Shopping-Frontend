@@ -398,6 +398,114 @@ $(function () {
     });
 
   /* =========================
+   * My Orders
+   * ======================= */
+
+  function showOrders() {
+    const uid = getCurrentUserId();
+    if (!uid) {
+      alert("Please login to view your orders.");
+      $("#btnNavLogin").click();
+      return;
+    }
+
+    $("#bodyContainer").html(
+      '<div class="p-4 text-center">Loading your orders...</div>'
+    );
+
+    $.ajax({
+      method: "GET",
+      url: API_BASE + "/orders/" + encodeURIComponent(uid),
+    })
+      .then(function (resp) {
+        if (!resp || resp.success === false) {
+          $("#bodyContainer").html(
+            '<div class="p-4 text-danger">Unable to load orders.</div>'
+          );
+          return;
+        }
+
+        const orders = resp.orders || [];
+        if (!orders.length) {
+          $("#bodyContainer").html(
+            '<div class="p-4"><h4>No orders found</h4><p>You have not placed any orders yet.</p></div>'
+          );
+          return;
+        }
+
+        let html =
+          '<div class="container my-4">' +
+          "<h3>My Orders</h3>" +
+          '<div class="table-responsive mt-3">' +
+          '<table class="table table-striped table-bordered align-middle">' +
+          "<thead>" +
+          "<tr>" +
+          "<th>#</th>" +
+          "<th>Order ID</th>" +
+          "<th>Date</th>" +
+          "<th>Items</th>" +
+          "<th>Total (₹)</th>" +
+          "<th>Status</th>" +
+          "</tr>" +
+          "</thead><tbody>";
+
+        orders.forEach(function (order, idx) {
+          const created = order.createdAt
+            ? new Date(order.createdAt).toLocaleString()
+            : "-";
+          const itemsText = Array.isArray(order.items)
+            ? order.items
+                .map(function (it) {
+                  return (
+                    (it.title || "Item") + " × " + (it.qty || 1)
+                  );
+                })
+                .join(", ")
+            : "-";
+
+          html +=
+            "<tr>" +
+            "<td>" +
+            (idx + 1) +
+            "</td>" +
+            "<td>" +
+            (order._id || "") +
+            "</td>" +
+            "<td>" +
+            created +
+            "</td>" +
+            "<td>" +
+            itemsText +
+            "</td>" +
+            "<td>" +
+            (order.total || 0) +
+            "</td>" +
+            "<td>" +
+            (order.status || "created") +
+            "</td>" +
+            "</tr>";
+        });
+
+        html += "</tbody></table></div></div>";
+
+        $("#bodyContainer").html(html);
+      })
+      .catch(function (err) {
+        console.error("showOrders error:", err);
+        $("#bodyContainer").html(
+          '<div class="p-4 text-danger">Error loading orders.</div>'
+        );
+      });
+  }
+
+  $("#btnNavOrders")
+    .off("click")
+    .on("click", function (e) {
+      e.preventDefault();
+      showOrders();
+    });
+
+  /* =========================
    * Cart display + checkout
    * ======================= */
 
