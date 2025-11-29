@@ -204,65 +204,62 @@ $(function () {
    * ======================= */
 
   function attachLoginHandler(onSuccess) {
-    $("#btnLogin")
-      .off("click")
-      .on("click", function () {
-        const formUserId = $("#txtUserId").val().trim();
-        const formPwd = $("#txtPwd").val();
+  $("#btnLogin")
+    .off("click")
+    .on("click", function () {
+      const formUserId = $("#txtUserId").val().trim();
+      const formPwd = $("#txtPwd").val();
 
-        if (!formUserId || !formPwd) {
-          alert("Please enter User Id and Password");
-          return;
-        }
+      if (!formUserId || !formPwd) {
+        alert("Please enter User Id and Password");
+        return;
+      }
 
-        $.ajax({
-          method: "POST",
-          url: API_BASE + "/login",
-          data: {
-            UserId: formUserId,
-            Password: formPwd,
-          },
+      $.ajax({
+        method: "POST",
+        url: API_BASE + "/login",
+        data: {
+          UserId: formUserId,
+          Password: formPwd,
+        },
+      })
+        .then(function (resp) {
+          if (!resp || resp.success === false) {
+            alert((resp && resp.message) || "Invalid username or password");
+            return;
+          }
+
+          // login success
+          $.cookie("userid", resp.userId, { path: "/" });
+          $("#user").text(resp.userId);
+          $("#btnSignout").text("Signout");
+
+          // restore per-user cart into session
+          try {
+            const per = localStorage.getItem("cart_" + resp.userId);
+            if (per) localStorage.setItem("cart", per);
+          } catch (e) {
+            console.warn("restore cart error:", e);
+          }
+
+          updateCartCount();
+
+          if (typeof onSuccess === "function") {
+            onSuccess();
+          } else {
+            $.ajax({ method: "GET", url: "/shophome.html" }).then(function (
+              resp2
+            ) {
+              $("#bodyContainer").html(resp2);
+            });
+          }
         })
-          .then(function (resp) {
-            if (!resp || resp.success === false) {
-              alert(
-                (resp && resp.message) || "Invalid Username or Password"
-              );
-              return;
-            }
-
-            // Login success
-            $.cookie("userid", formUserId, { path: "/" });
-            $("#user").text(formUserId);
-            $("#btnSignout").text("Signout");
-
-            // restore per-user cart into session
-            try {
-              const per = localStorage.getItem("cart_" + formUserId);
-              if (per) localStorage.setItem("cart", per);
-            } catch (e) {
-              console.warn("restore cart error:", e);
-            }
-
-            updateCartCount();
-
-            if (typeof onSuccess === "function") {
-              onSuccess();
-            } else {
-              $.ajax({ method: "GET", url: "/shophome.html" }).then(function (
-                resp
-              ) {
-                $("#bodyContainer").html(resp);
-              });
-            }
-          })
-          .catch(function (err) {
-            console.error("Login error:", err);
-            alert("Login error");
-          });
-      });
-  }
-
+        .catch(function (err) {
+          console.error("Login error:", err);
+          alert("Login failed. Please try again.");
+        });
+    });
+}
   /* =========================
    * Nav: Login
    * ======================= */
