@@ -200,66 +200,66 @@ $(function () {
     });
 
   /* =========================
-   * Login helper  (NEW – uses /login API)
+   * Login helper – uses POST /login
    * ======================= */
 
   function attachLoginHandler(onSuccess) {
-  $("#btnLogin")
-    .off("click")
-    .on("click", function () {
-      const formUserId = $("#txtUserId").val().trim();
-      const formPwd = $("#txtPwd").val();
+    $("#btnLogin")
+      .off("click")
+      .on("click", function () {
+        const formUserId = $("#txtUserId").val().trim();
+        const formPwd = $("#txtPwd").val();
 
-      if (!formUserId || !formPwd) {
-        alert("Please enter User Id and Password");
-        return;
-      }
+        if (!formUserId || !formPwd) {
+          alert("Please enter UserId and Password");
+          return;
+        }
 
-      $.ajax({
-        method: "POST",
-        url: API_BASE + "/login",
-        data: {
-          UserId: formUserId,
-          Password: formPwd,
-        },
-      })
-        .then(function (resp) {
-          if (!resp || resp.success === false) {
-            alert((resp && resp.message) || "Invalid username or password");
-            return;
-          }
-
-          // login success
-          $.cookie("userid", resp.userId, { path: "/" });
-          $("#user").text(resp.userId);
-          $("#btnSignout").text("Signout");
-
-          // restore per-user cart into session
-          try {
-            const per = localStorage.getItem("cart_" + resp.userId);
-            if (per) localStorage.setItem("cart", per);
-          } catch (e) {
-            console.warn("restore cart error:", e);
-          }
-
-          updateCartCount();
-
-          if (typeof onSuccess === "function") {
-            onSuccess();
-          } else {
-            $.ajax({ method: "GET", url: "/shophome.html" }).then(function (
-              resp2
-            ) {
-              $("#bodyContainer").html(resp2);
-            });
-          }
+        $.ajax({
+          method: "POST",
+          url: API_BASE + "/login",
+          data: {
+            UserId: formUserId,
+            Password: formPwd,
+          },
         })
-        .catch(function (err) {
-          console.error("Login error:", err);
-          alert("Login failed. Please try again.");
-        });
-    });
-}
+          .then(function (resp) {
+            if (!resp || resp.success === false) {
+              alert((resp && resp.message) || "Invalid username or password");
+              return;
+            }
+
+            $.cookie("userid", formUserId, { path: "/" });
+            $("#user").text(formUserId);
+            $("#btnSignout").text("Signout");
+
+            // restore per-user cart into session
+            try {
+              const per = localStorage.getItem("cart_" + formUserId);
+              if (per) localStorage.setItem("cart", per);
+            } catch (e) {
+              console.warn("restore cart error:", e);
+            }
+
+            updateCartCount();
+
+            if (typeof onSuccess === "function") {
+              onSuccess();
+            } else {
+              $.ajax({ method: "GET", url: "/shophome.html" }).then(function (
+                resp2
+              ) {
+                $("#bodyContainer").html(resp2);
+              });
+            }
+          })
+          .catch(function (err) {
+            console.error("Login fetch error:", err);
+            alert("Login error");
+          });
+      });
+  }
+
   /* =========================
    * Nav: Login
    * ======================= */
@@ -726,11 +726,9 @@ $(function () {
     });
 
   /* =========================
-   * Products + Categories
-   * (with search + sort)
+   * Products + Categories (search + sort)
    * ======================= */
 
-  // Render products list into #productCatalog
   function renderProducts(list) {
     $("#productCatalog").empty();
 
@@ -775,7 +773,6 @@ $(function () {
     });
   }
 
-  // Apply search + sort on currentProducts
   function applyFilters() {
     if (!Array.isArray(currentProducts)) {
       currentProducts = [];
@@ -813,7 +810,6 @@ $(function () {
     renderProducts(filtered);
   }
 
-  // Bind input events (ensure only once)
   function bindProductFilters() {
     if ($("#txtSearch").length) {
       $("#txtSearch").off("input").on("input", applyFilters);
@@ -823,7 +819,6 @@ $(function () {
     }
   }
 
-  // Load products (optionally by category)
   function getProducts(categoryName) {
     var url = API_BASE + "/getproducts";
     if (categoryName) {
@@ -834,13 +829,9 @@ $(function () {
       .then(function (response) {
         currentProducts = Array.isArray(response) ? response : [];
 
-        // search + sort handlers attach
         bindProductFilters();
-
-        // first render with current filters (if any)
         applyFilters();
 
-        // Product detail click handler
         $("#productCatalog")
           .off("click", ".product-card")
           .on("click", ".product-card", function () {
