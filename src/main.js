@@ -200,7 +200,7 @@ $(function () {
     });
 
   /* =========================
-   * Login helper
+   * Login helper  (NEW – uses /login API)
    * ======================= */
 
   function attachLoginHandler(onSuccess) {
@@ -215,7 +215,6 @@ $(function () {
           return;
         }
 
-        // ✅ NEW: call /login API instead of fetching all customers
         $.ajax({
           method: "POST",
           url: API_BASE + "/login",
@@ -225,34 +224,36 @@ $(function () {
           },
         })
           .then(function (resp) {
-            if (resp && resp.success) {
-              $.cookie("userid", formUserId, { path: "/" });
-              $("#user").text(formUserId);
-              $("#btnSignout").text("Signout");
-
-              // restore per-user cart into session
-              try {
-                const per = localStorage.getItem("cart_" + formUserId);
-                if (per) localStorage.setItem("cart", per);
-              } catch (e) {
-                console.warn("restore cart error:", e);
-              }
-
-              updateCartCount();
-
-              if (typeof onSuccess === "function") {
-                onSuccess();
-              } else {
-                $.ajax({ method: "GET", url: "/shophome.html" }).then(function (
-                  resp2
-                ) {
-                  $("#bodyContainer").html(resp2);
-                });
-              }
-            } else {
+            if (!resp || resp.success === false) {
               alert(
-                (resp && resp.message) || "Invalid Username | Password.."
+                (resp && resp.message) || "Invalid Username or Password"
               );
+              return;
+            }
+
+            // Login success
+            $.cookie("userid", formUserId, { path: "/" });
+            $("#user").text(formUserId);
+            $("#btnSignout").text("Signout");
+
+            // restore per-user cart into session
+            try {
+              const per = localStorage.getItem("cart_" + formUserId);
+              if (per) localStorage.setItem("cart", per);
+            } catch (e) {
+              console.warn("restore cart error:", e);
+            }
+
+            updateCartCount();
+
+            if (typeof onSuccess === "function") {
+              onSuccess();
+            } else {
+              $.ajax({ method: "GET", url: "/shophome.html" }).then(function (
+                resp
+              ) {
+                $("#bodyContainer").html(resp);
+              });
             }
           })
           .catch(function (err) {
