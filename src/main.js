@@ -207,16 +207,25 @@ $(function () {
     $("#btnLogin")
       .off("click")
       .on("click", function () {
-        const formUserId = $("#txtUserId").val();
+        const formUserId = $("#txtUserId").val().trim();
         const formPwd = $("#txtPwd").val();
 
-        $.ajax({ method: "GET", url: API_BASE + "/getcustomers" })
-          .then(function (customers) {
-            const user = customers.find(function (u) {
-              return u.UserId === formUserId;
-            });
+        if (!formUserId || !formPwd) {
+          alert("Please enter User Id and Password");
+          return;
+        }
 
-            if (user && user.Password === formPwd) {
+        // ✅ NEW: call /login API instead of fetching all customers
+        $.ajax({
+          method: "POST",
+          url: API_BASE + "/login",
+          data: {
+            UserId: formUserId,
+            Password: formPwd,
+          },
+        })
+          .then(function (resp) {
+            if (resp && resp.success) {
               $.cookie("userid", formUserId, { path: "/" });
               $("#user").text(formUserId);
               $("#btnSignout").text("Signout");
@@ -235,17 +244,19 @@ $(function () {
                 onSuccess();
               } else {
                 $.ajax({ method: "GET", url: "/shophome.html" }).then(function (
-                  resp
+                  resp2
                 ) {
-                  $("#bodyContainer").html(resp);
+                  $("#bodyContainer").html(resp2);
                 });
               }
             } else {
-              alert("Invalid Username | Password..");
+              alert(
+                (resp && resp.message) || "Invalid Username | Password.."
+              );
             }
           })
           .catch(function (err) {
-            console.error("Login fetch error:", err);
+            console.error("Login error:", err);
             alert("Login error");
           });
       });
