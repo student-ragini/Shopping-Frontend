@@ -160,7 +160,6 @@ $(function () {
               Password: $("#Password").val(),
             };
 
-            // Simple client-side validation
             if (
               !customerData.UserId ||
               !customerData.FirstName ||
@@ -235,7 +234,6 @@ $(function () {
             $("#user").text(uid);
             $("#btnSignout").text("Signout");
 
-            // restore per-user cart into session
             try {
               const per = localStorage.getItem("cart_" + uid);
               if (per) localStorage.setItem("cart", per);
@@ -324,7 +322,6 @@ $(function () {
     .off("click")
     .on("click", function () {
       if (!getCurrentUserId()) {
-        // not logged in → first login
         $.ajax({ method: "GET", url: "/login.html" }).then(function (resp) {
           $("#bodyContainer").html(resp);
           attachLoginHandler(function () {
@@ -337,7 +334,6 @@ $(function () {
           });
         });
       } else {
-        // already logged in → directly open products
         $.ajax({ method: "GET", url: "/products.html" }).then(function (resp) {
           $("#bodyContainer").html(resp);
           getProducts();
@@ -374,7 +370,7 @@ $(function () {
       }
     });
 
-  // (Optional) footer shortcut – safe even if element not present
+  // Footer quick-links
   $("#navCategoriesFooter")
     .off("click")
     .on("click", function (e) {
@@ -382,7 +378,6 @@ $(function () {
       $("#btnNavCategories").click();
     });
 
-  // Footer links for Shop / Register (if present)
   $("#navShopF")
     .off("click")
     .on("click", function (e) {
@@ -398,8 +393,99 @@ $(function () {
     });
 
   /* =========================
-   * My Orders
+   * My Orders (LIST + DETAILS)
    * ======================= */
+
+  function renderOrderDetails(order) {
+    if (!order) {
+      alert("Order not found.");
+      return;
+    }
+
+    const created = order.createdAt
+      ? new Date(order.createdAt).toLocaleString()
+      : "-";
+
+    const itemsRows = Array.isArray(order.items) && order.items.length
+      ? order.items
+          .map(function (it, i) {
+            const title = it.title || "Item " + (i + 1);
+            const qty = it.qty || 1;
+            const price = it.unitPrice || it.price || 0;
+            const total = Number(price) * Number(qty);
+            return (
+              "<tr>" +
+              "<td>" +
+              (i + 1) +
+              "</td>" +
+              "<td>" +
+              title +
+              "</td>" +
+              "<td>" +
+              qty +
+              "</td>" +
+              "<td>" +
+              price +
+              "</td>" +
+              "<td>" +
+              total +
+              "</td>" +
+              "</tr>"
+            );
+          })
+          .join("")
+      : '<tr><td colspan="5" class="text-center">No items</td></tr>';
+
+    const html =
+      '<div class="container my-4">' +
+      '<h3 class="mb-3">Order Details</h3>' +
+      '<div class="card mb-3">' +
+      '<div class="card-body">' +
+      "<p><strong>Order ID:</strong> " +
+      (order._id || "") +
+      "</p>" +
+      "<p><strong>Date:</strong> " +
+      created +
+      "</p>" +
+      "<p><strong>Status:</strong> " +
+      (order.status || "created") +
+      "</p>" +
+      "<p><strong>Total:</strong> ₹" +
+      (order.total || 0) +
+      "</p>" +
+      "</div>" +
+      "</div>" +
+      '<div class="card">' +
+      '<div class="card-body">' +
+      "<h5 class='card-title mb-3'>Items</h5>" +
+      '<div class="table-responsive">' +
+      '<table class="table table-striped table-bordered align-middle">' +
+      "<thead><tr>" +
+      "<th>#</th>" +
+      "<th>Item</th>" +
+      "<th>Qty</th>" +
+      "<th>Price (₹)</th>" +
+      "<th>Total (₹)</th>" +
+      "</tr></thead><tbody>" +
+      itemsRows +
+      "</tbody></table>" +
+      "</div>" +
+      "</div>" +
+      "</div>" +
+      '<div class="mt-3">' +
+      '<button id="btnBackToOrders" class="btn btn-secondary">Back to My Orders</button>' +
+      "</div>" +
+      "</div>";
+
+    $("#bodyContainer").html(html);
+
+    $("#btnBackToOrders")
+      .off("click")
+      .on("click", function (e) {
+        e.preventDefault();
+        showOrders();
+      });
+  }
 
   function showOrders() {
     const uid = getCurrentUserId();
@@ -418,14 +504,14 @@ $(function () {
       url: API_BASE + "/orders/" + encodeURIComponent(uid),
     })
       .then(function (resp) {
-        // Backend returns ARRAY directly. If someday we change to {orders: []}, woh bhi handle kar le.
-        let orders = [];
-        if (Array.isArray(resp)) {
-          orders = resp;
-        } else if (resp && Array.isArray(resp.orders)) {
-          orders = resp.orders;
+        if (!resp || resp.success === false) {
+          $("#bodyContainer").html(
+            '<div class="p-4 text-danger">Unable to load orders.</div>'
+          );
+          return;
         }
 
+        const orders = resp.orders || [];
         if (!orders.length) {
           $("#bodyContainer").html(
             '<div class="p-4"><h4>No orders found</h4><p>You have not placed any orders yet.</p></div>'
@@ -446,6 +532,7 @@ $(function () {
           "<th>Items</th>" +
           "<th>Total (₹)</th>" +
           "<th>Status</th>" +
+          "<th>Actions</th>" +
           "</tr>" +
           "</thead><tbody>";
 
@@ -481,12 +568,26 @@ $(function () {
             "<td>" +
             (order.status || "created") +
             "</td>" +
+            "<td>" +
+            '<button class="btn btn-sm btn-outline-primary btn-view-order" data-idx="' +
+            idx +
+            '">View</button>' +
+            "</td>" +
             "</tr>";
         });
 
         html += "</tbody></table></div></div>";
 
         $("#bodyContainer").html(html);
+
+        $("#bodyContainer")
+          .off("click", ".btn-view-order")
+          .on("click", ".btn-view-order", function (e) {
+            e.preventDefault();
+            const idx = Number($(this).data("idx"));
+            const order = orders[idx];
+            renderOrderDetails(order);
+          });
       })
       .catch(function (err) {
         console.error("showOrders error:", err);
@@ -627,7 +728,6 @@ $(function () {
 
         $("#bodyContainer").html(html);
 
-        // Remove item
         $(".btn-remove")
           .off("click")
           .on("click", function () {
@@ -641,7 +741,6 @@ $(function () {
             showCart();
           });
 
-        // Increase qty
         $(".btn-increase")
           .off("click")
           .on("click", function () {
@@ -655,7 +754,6 @@ $(function () {
             showCart();
           });
 
-        // Decrease qty
         $(".btn-decrease")
           .off("click")
           .on("click", function () {
@@ -670,7 +768,6 @@ $(function () {
             showCart();
           });
 
-        // Continue shopping
         $("#btnContinue")
           .off("click")
           .on("click", function () {
@@ -682,7 +779,6 @@ $(function () {
             });
           });
 
-        // Checkout
         $("#btnCheckout")
           .off("click")
           .on("click", async function () {
@@ -856,7 +952,7 @@ $(function () {
           ? String(value._id)
           : "";
 
-      var card =
+      const card =
         '<div class="card m-2 p-2 product-card" ' +
         'style="width:200px;cursor:pointer;" ' +
         'data-id="' +
@@ -928,7 +1024,7 @@ $(function () {
   }
 
   function getProducts(categoryName) {
-    var url = API_BASE + "/getproducts";
+    let url = API_BASE + "/getproducts";
     if (categoryName) {
       url = API_BASE + "/categories/" + encodeURIComponent(categoryName);
     }
