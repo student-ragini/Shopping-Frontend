@@ -418,14 +418,14 @@ $(function () {
       url: API_BASE + "/orders/" + encodeURIComponent(uid),
     })
       .then(function (resp) {
-        if (!resp || resp.success === false) {
-          $("#bodyContainer").html(
-            '<div class="p-4 text-danger">Unable to load orders.</div>'
-          );
-          return;
+        // Backend returns ARRAY directly. If someday we change to {orders: []}, woh bhi handle kar le.
+        let orders = [];
+        if (Array.isArray(resp)) {
+          orders = resp;
+        } else if (resp && Array.isArray(resp.orders)) {
+          orders = resp.orders;
         }
 
-        const orders = resp.orders || [];
         if (!orders.length) {
           $("#bodyContainer").html(
             '<div class="p-4"><h4>No orders found</h4><p>You have not placed any orders yet.</p></div>'
@@ -456,9 +456,7 @@ $(function () {
           const itemsText = Array.isArray(order.items)
             ? order.items
                 .map(function (it) {
-                  return (
-                    (it.title || "Item") + " × " + (it.qty || 1)
-                  );
+                  return (it.title || "Item") + " × " + (it.qty || 1);
                 })
                 .join(", ")
             : "-";
