@@ -229,13 +229,15 @@ $(function () {
               return;
             }
 
-            $.cookie("userid", formUserId, { path: "/" });
-            $("#user").text(formUserId);
+            const uid = resp.userId || formUserId;
+
+            $.cookie("userid", uid, { path: "/" });
+            $("#user").text(uid);
             $("#btnSignout").text("Signout");
 
             // restore per-user cart into session
             try {
-              const per = localStorage.getItem("cart_" + formUserId);
+              const per = localStorage.getItem("cart_" + uid);
               if (per) localStorage.setItem("cart", per);
             } catch (e) {
               console.warn("restore cart error:", e);
