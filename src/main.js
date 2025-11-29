@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 /* global $, document */
 
-// 👇 Backend base URL 
+// 👇 Backend base URL
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
   "https://shopping-backend-jb5p.onrender.com";
@@ -146,31 +146,49 @@ $(function () {
           .off("click")
           .on("click", function () {
             const customerData = {
-              UserId: $("#UserId").val(),
-              FirstName: $("#FirstName").val(),
-              LastName: $("#LastName").val(),
+              UserId: $("#UserId").val().trim(),
+              FirstName: $("#FirstName").val().trim(),
+              LastName: $("#LastName").val().trim(),
               DateOfBirth: $("#DateOfBirth").val(),
-              Email: $("#Email").val(),
+              Email: $("#Email").val().trim(),
               Gender: $("#Gender").val(),
-              Address: $("#Address").val(),
-              PostalCode: $("#PostalCode").val(),
-              State: $("#State").val(),
-              Country: $("#Country").val(),
-              Mobile: $("#Mobile").val(),
+              Address: $("#Address").val().trim(),
+              PostalCode: $("#PostalCode").val().trim(),
+              State: $("#State").val().trim(),
+              Country: $("#Country").val().trim(),
+              Mobile: $("#Mobile").val().trim(),
               Password: $("#Password").val(),
             };
+
+            // Simple client-side validation
+            if (
+              !customerData.UserId ||
+              !customerData.FirstName ||
+              !customerData.LastName ||
+              !customerData.Email ||
+              !customerData.Password
+            ) {
+              alert("Please fill all required fields");
+              return;
+            }
 
             $.ajax({
               method: "POST",
               url: API_BASE + "/customerregister",
               data: customerData,
             })
-              .then(function () {
-                alert("Register Successfully..");
+              .then(function (resp) {
+                if (resp && resp.success === false) {
+                  alert(resp.message || "Registration failed");
+                  return;
+                }
+
+                alert((resp && resp.message) || "Registered successfully");
+
                 $.ajax({ method: "GET", url: "/login.html" }).then(function (
-                  resp
+                  resp2
                 ) {
-                  $("#bodyContainer").html(resp);
+                  $("#bodyContainer").html(resp2);
                 });
               })
               .catch(function (err) {
