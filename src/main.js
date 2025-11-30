@@ -314,7 +314,7 @@ $(function () {
         });
     });
 
-    /* =========================
+  /* =========================
    * Nav: Profile
    * ======================= */
 
@@ -430,35 +430,36 @@ $(function () {
       ? new Date(order.createdAt).toLocaleString()
       : "-";
 
-    const itemsRows = Array.isArray(order.items) && order.items.length
-      ? order.items
-          .map(function (it, i) {
-            const title = it.title || "Item " + (i + 1);
-            const qty = it.qty || 1;
-            const price = it.unitPrice || it.price || 0;
-            const total = Number(price) * Number(qty);
-            return (
-              "<tr>" +
-              "<td>" +
-              (i + 1) +
-              "</td>" +
-              "<td>" +
-              title +
-              "</td>" +
-              "<td>" +
-              qty +
-              "</td>" +
-              "<td>" +
-              price +
-              "</td>" +
-              "<td>" +
-              total +
-              "</td>" +
-              "</tr>"
-            );
-          })
-          .join("")
-      : '<tr><td colspan="5" class="text-center">No items</td></tr>';
+    const itemsRows =
+      Array.isArray(order.items) && order.items.length
+        ? order.items
+            .map(function (it, i) {
+              const title = it.title || "Item " + (i + 1);
+              const qty = it.qty || 1;
+              const price = it.unitPrice || it.price || 0;
+              const total = Number(price) * Number(qty);
+              return (
+                "<tr>" +
+                "<td>" +
+                (i + 1) +
+                "</td>" +
+                "<td>" +
+                title +
+                "</td>" +
+                "<td>" +
+                qty +
+                "</td>" +
+                "<td>" +
+                price +
+                "</td>" +
+                "<td>" +
+                total +
+                "</td>" +
+                "</tr>"
+              );
+            })
+            .join("")
+        : '<tr><td colspan="5" class="text-center">No items</td></tr>';
 
     const html =
       '<div class="container my-4">' +
