@@ -314,6 +314,30 @@ $(function () {
         });
     });
 
+    /* =========================
+   * Nav: Profile
+   * ======================= */
+
+  $("#btnNavProfile")
+    .off("click")
+    .on("click", function () {
+      const uid = getCurrentUserId();
+      if (!uid) {
+        alert("Please login to view your profile.");
+        $("#btnNavLogin").click();
+        return;
+      }
+
+      $.ajax({ method: "GET", url: "/profile.html" })
+        .then(function (resp) {
+          $("#bodyContainer").html(resp);
+          loadProfilePage();
+        })
+        .catch(function (err) {
+          console.error("Load profile.html error:", err);
+        });
+    });
+
   /* =========================
    * Nav: Shop
    * ======================= */
@@ -1096,6 +1120,117 @@ $(function () {
         $("#categoryList").html(
           '<p class="text-danger p-3">Unable to load categories.</p>'
         );
+      });
+  }
+
+  /* =========================
+   * Profile page – load & update
+   * ======================= */
+
+  function loadProfilePage() {
+    const uid = getCurrentUserId();
+    if (!uid) {
+      alert("Please login again.");
+      $("#btnNavLogin").click();
+      return;
+    }
+
+    // back button
+    $("#btnBackFromProfile")
+      .off("click")
+      .on("click", function () {
+        $.ajax({ method: "GET", url: "/products.html" }).then(function (resp) {
+          $("#bodyContainer").html(resp);
+          getProducts();
+        });
+      });
+
+    // fetch profile data
+    $.ajax({
+      method: "GET",
+      url: API_BASE + "/customers/" + encodeURIComponent(uid),
+    })
+      .then(function (resp) {
+        if (!resp || resp.success === false || !resp.customer) {
+          alert(
+            (resp && resp.message) ||
+              "Unable to load profile. Please try again later."
+          );
+          return;
+        }
+
+        const c = resp.customer;
+
+        $("#UserId").val(c.UserId || uid).prop("disabled", true);
+        $("#FirstName").val(c.FirstName || "");
+        $("#LastName").val(c.LastName || "");
+        $("#Email").val(c.Email || "");
+        $("#Gender").val(c.Gender || "");
+        $("#Address").val(c.Address || "");
+        $("#PostalCode").val(c.PostalCode || "");
+        $("#State").val(c.State || "");
+        $("#Country").val(c.Country || "");
+        $("#Mobile").val(c.Mobile || "");
+
+        if (c.DateOfBirth) {
+          const d = new Date(c.DateOfBirth);
+          const iso = d.toISOString().slice(0, 10);
+          $("#DateOfBirth").val(iso);
+        } else {
+          $("#DateOfBirth").val("");
+        }
+
+        // update click handler
+        $("#btnUpdateProfile")
+          .off("click")
+          .on("click", function () {
+            const payload = {
+              FirstName: $("#FirstName").val().trim(),
+              LastName: $("#LastName").val().trim(),
+              DateOfBirth: $("#DateOfBirth").val(),
+              Email: $("#Email").val().trim(),
+              Gender: $("#Gender").val(),
+              Address: $("#Address").val().trim(),
+              PostalCode: $("#PostalCode").val().trim(),
+              State: $("#State").val().trim(),
+              Country: $("#Country").val().trim(),
+              Mobile: $("#Mobile").val().trim(),
+            };
+
+            const newPwd = $("#Password").val();
+            if (newPwd && newPwd.trim() !== "") {
+              if (newPwd.trim().length < 6) {
+                alert("New password must be at least 6 characters.");
+                return;
+              }
+              payload.Password = newPwd.trim();
+            }
+
+            $.ajax({
+              method: "PUT",
+              url: API_BASE + "/customers/" + encodeURIComponent(uid),
+              data: payload,
+            })
+              .then(function (r) {
+                if (!r || r.success === false) {
+                  alert((r && r.message) || "Update failed");
+                  return;
+                }
+
+                alert(r.message || "Profile updated successfully");
+
+                // password field clear
+                $("#Password").val("");
+              })
+              .catch(function (err) {
+                console.error("Profile update error:", err);
+                alert("Profile update failed. Please try again.");
+              });
+          });
+      })
+      .catch(function (err) {
+        console.error("Load profile data error:", err);
+        alert("Unable to load profile right now.");
       });
   }
 
