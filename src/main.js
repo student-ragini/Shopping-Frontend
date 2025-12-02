@@ -1196,7 +1196,7 @@ $(function () {
               State: $("#State").val().trim(),
               Country: $("#Country").val().trim(),
               Mobile: $("#Mobile").val().trim(),
-            });
+            };
 
             const newPwd = $("#Password").val();
             if (newPwd && newPwd.trim() !== "") {
