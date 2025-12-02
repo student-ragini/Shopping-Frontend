@@ -21,7 +21,9 @@ $(function () {
   function fixImageUrl(raw) {
     if (!raw) return "";
     try {
+      // full URL?
       if (/^https?:\/\//i.test(raw)) {
+        // localhost ko ignore karke public se lo
         if (/^(https?:\/\/)(127\.0\.0\.1|localhost)/i.test(raw)) {
           const fname = raw.split("/").pop();
           return fname ? "/public/" + fname : "";
@@ -29,10 +31,12 @@ $(function () {
         return raw;
       }
 
+      // "public/..." pattern
       if (/^public[\\/]/i.test(raw)) {
         return "/" + raw.replace(/^[\\/]+/, "");
       }
 
+      // sirf file name
       const fname = raw.split(/[\\/]/).pop();
       return fname ? "/public/" + fname : "";
     } catch (e) {
@@ -289,28 +293,122 @@ $(function () {
         .catch(function () {});
     });
 
- /* =========================
+  /* =========================
+   * Profile page - load & update
+   * ======================= */
+
+  function loadProfilePage() {
+    const uid = getCurrentUserId();
+    if (!uid) {
+      alert("Please login first.");
+      $("#btnNavLogin").click();
+      return;
+    }
+
+    // 1) profile.html load karo
+    $.ajax({ method: "GET", url: "/profile.html" }).then(function (html) {
+      $("#bodyContainer").html(html);
+
+      // 2) ab backend se data lao
+      fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
+        .then((r) => r.json())
+        .then((resp) => {
+          console.log("PROFILE LOAD →", resp);
+
+          if (resp && resp.success && resp.customer) {
+            const c = resp.customer;
+
+            $("#UserId").val(c.UserId || c.userId || "");
+            $("#FirstName").val(c.FirstName || c.firstName || "");
+            $("#LastName").val(c.LastName || c.lastName || "");
+            $("#Email").val(c.Email || c.email || "");
+            $("#Gender").val(c.Gender || c.gender || "");
+            $("#Address").val(c.Address || c.address || "");
+            $("#PostalCode").val(c.PostalCode || c.postalCode || "");
+            $("#State").val(c.State || c.state || "");
+            $("#Country").val(c.Country || c.country || "");
+            $("#Mobile").val(c.Mobile || c.mobile || "");
+
+            // DOB → yyyy-mm-dd
+            if (c.DateOfBirth || c.dateOfBirth) {
+              const dobStr = c.DateOfBirth || c.dateOfBirth;
+              const dt = new Date(dobStr);
+              if (!isNaN(dt.getTime())) {
+                const mm = String(dt.getMonth() + 1).padStart(2, "0");
+                const dd = String(dt.getDate()).padStart(2, "0");
+                $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
+              }
+            }
+          }
+        })
+        .catch((err) => console.error("PROFILE LOAD ERROR:", err));
+
+      // 3) Update button
+      $("#btnUpdateProfile")
+        .off("click")
+        .on("click", function (e) {
+          e.preventDefault();
+
+          const payload = {
+            UserId: $("#UserId").val(),
+            FirstName: $("#FirstName").val(),
+            LastName: $("#LastName").val(),
+            Email: $("#Email").val(),
+            Gender: $("#Gender").val(),
+            Address: $("#Address").val(),
+            PostalCode: $("#PostalCode").val(),
+            State: $("#State").val(),
+            Country: $("#Country").val(),
+            Mobile: $("#Mobile").val(),
+            DateOfBirth: $("#DateOfBirth").val() || null,
+          };
+
+          // password tabhi bhejna jab box me kuch ho
+          if ($("#Password").val().trim() !== "") {
+            payload.Password = $("#Password").val().trim();
+          }
+
+          $.ajax({
+            method: "POST",
+            url: API_BASE + "/updatecustomer",
+            data: payload,
+          })
+            .then(function (up) {
+              console.log("PROFILE UPDATE RESPONSE →", up);
+              if (up && up.success) {
+                alert(up.message || "Profile updated successfully.");
+                $("#Password").val(""); // clear password
+              } else {
+                alert(up.message || "Profile update failed. Please try again.");
+              }
+            })
+            .catch(function (err) {
+              console.error("PROFILE UPDATE ERROR:", err);
+              alert("Profile update failed. Please try again.");
+            });
+        });
+
+      // 4) Back button
+      $("#btnBackFromProfile")
+        .off("click")
+        .on("click", function () {
+          $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
+            $("#bodyContainer").html(p);
+            getProducts();
+          });
+        });
+    });
+  }
+
+  /* =========================
    * Nav: Profile
    * ======================= */
 
   $("#btnNavProfile")
     .off("click")
     .on("click", function () {
-      const uid = getCurrentUserId();
-      if (!uid) {
-        alert("Please login to view your profile.");
-        $("#btnNavLogin").click();
-        return;
-      }
-
-      $.ajax({ method: "GET", url: "/profile.html" })
-        .then(function (resp) {
-          $("#bodyContainer").html(resp);
-          loadProfilePage();
-        })
-        .catch(function () {});
+      loadProfilePage();
     });
-
 
   /* =========================
    * Nav: Shop
@@ -891,25 +989,25 @@ $(function () {
                     );
                   });
               } else {
-            alert(
-              "Unable to create order: " +
-                (createResp && createResp.message
-                  ? createResp.message
-                  : "Unknown error")
-            );
-          }
-        } catch (err) {
-          console.error("Checkout error:", err);
-          alert("Error during checkout. See console for details.");
-        }
+                alert(
+                  "Unable to create order: " +
+                    (createResp && createResp.message
+                      ? createResp.message
+                      : "Unknown error")
+                );
+              }
+            } catch (err) {
+              console.error("Checkout error:", err);
+              alert("Error during checkout. See console for details.");
+            }
+          });
+      })
+      .catch(function (err) {
+        console.error("Failed to load products for cart:", err);
+        $("#bodyContainer").html(
+          '<div class="p-4 text-danger">Unable to load cart items</div>'
+        );
       });
-  })
-    .catch(function (err) {
-      console.error("Failed to load products for cart:", err);
-      $("#bodyContainer").html(
-        '<div class="p-4 text-danger">Unable to load cart items</div>'
-      );
-    });
   }
 
   // Cart button → show cart
@@ -1090,123 +1188,6 @@ $(function () {
       });
   }
 
- /* =========================
-   * Profile page – load & update
-   * ======================= */
-function loadProfilePage() {
-  const uid = getCurrentUserId();
-  if (!uid) {
-    alert("Please login first.");
-    $("#btnNavLogin").click();
-    return;
-  }
-
-  // 1) Profile HTML load
-  $.ajax({ method: "GET", url: "/profile.html" }).then(function (html) {
-    $("#bodyContainer").html(html);
-
-    // userId 
-    $("#UserId").val(uid);
-
-    // 2) Backend  customer data
-    $.ajax({
-      method: "GET",
-      url: `${API_BASE}/customers/${encodeURIComponent(uid)}`,
-    })
-      .done(function (resp) {
-        console.log("PROFILE LOAD →", resp);
-
-        if (!resp || resp.success === false || !resp.customer) {
-          console.warn("No customer data in response");
-          return;
-        }
-
-        const c = resp.customer;
-
-        
-        $("#UserId").val(c.UserId || "");
-        $("#FirstName").val(c.FirstName || "");
-        $("#LastName").val(c.LastName || "");
-        $("#Email").val(c.Email || "");
-        $("#Gender").val(c.Gender || "");
-        $("#Address").val(c.Address || "");
-        $("#PostalCode").val(c.PostalCode || "");
-        $("#State").val(c.State || "");
-        $("#Country").val(c.Country || "");
-        $("#Mobile").val(c.Mobile || "");
-
-        // DateOfBirth → yyyy-mm-dd
-        if (c.DateOfBirth) {
-          const dt = new Date(c.DateOfBirth);
-          const yyyy = dt.getFullYear();
-          const mm = String(dt.getMonth() + 1).padStart(2, "0");
-          const dd = String(dt.getDate()).padStart(2, "0");
-          $("#DateOfBirth").val(`${yyyy}-${mm}-${dd}`);
-        }
-      })
-      .fail(function (err) {
-        console.error("PROFILE LOAD ERROR:", err);
-        alert("Unable to load profile info.");
-      });
-
-    // 3) Update button 
-    $("#btnUpdateProfile")
-      .off("click")
-      .on("click", function (e) {
-        e.preventDefault();
-
-        const uid2 = $("#UserId").val() || uid;
-
-        const payload = {
-          firstName: $("#FirstName").val(),
-          lastName: $("#LastName").val(),
-          email: $("#Email").val(),
-          gender: $("#Gender").val(),
-          address: $("#Address").val(),
-          postalCode: $("#PostalCode").val(),
-          state: $("#State").val(),
-          country: $("#Country").val(),
-          mobile: $("#Mobile").val(),
-          dateOfBirth: $("#DateOfBirth").val() || null,
-        };
-
-        const newPwd = $("#Password").val().trim();
-        if (newPwd !== "") {
-          payload.password = newPwd;
-        }
-
-        $.ajax({
-          method: "PUT",
-          url: `${API_BASE}/customers/${encodeURIComponent(uid2)}`,
-          contentType: "application/json",
-          data: JSON.stringify(payload),
-        })
-          .done(function (up) {
-            console.log("PROFILE UPDATE →", up);
-            if (up && up.success) {
-              alert(up.message || "Profile updated successfully.");
-              $("#Password").val("");
-            } else {
-              alert("Profile update failed. Please try again.");
-            }
-          })
-          .fail(function (err) {
-            console.error("PROFILE UPDATE ERROR:", err);
-            alert("Profile update failed, please try again.");
-          });
-      });
-
-    // 4) Back button 
-    $("#btnBackFromProfile")
-      .off("click")
-      .on("click", function () {
-        $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
-          $("#bodyContainer").html(p);
-          getProducts();
-        });
-      });
-  });
-}
   /* =========================
    * Product detail page
    * ======================= */
