@@ -1,10 +1,10 @@
 /* eslint-disable no-unused-vars */
 /* global $, document */
 
-// 👇 Backend base URL
+// Backend base URL
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
-  "https://shopping-backend-jb5p.onrender.com";
+  "https://shopping-backend-jb5-tomers.onrender.com";
 
 $(function () {
   // Last loaded products (for search + sort)
@@ -14,18 +14,14 @@ $(function () {
    * Helpers
    * ======================= */
 
-  // Current logged-in user id from cookie
   function getCurrentUserId() {
     return $.cookie("userid") || null;
   }
 
-  // Normalize product image paths
   function fixImageUrl(raw) {
     if (!raw) return "";
     try {
-      // Absolute http(s) URL
       if (/^https?:\/\//i.test(raw)) {
-        // If it is pointing to localhost, fall back to public file name
         if (/^(https?:\/\/)(127\.0\.0\.1|localhost)/i.test(raw)) {
           const fname = raw.split("/").pop();
           return fname ? "/public/" + fname : "";
@@ -33,21 +29,17 @@ $(function () {
         return raw;
       }
 
-      // Already something like "public/iphone.jpg"
       if (/^public[\\/]/i.test(raw)) {
         return "/" + raw.replace(/^[\\/]+/, "");
       }
 
-      // "iphone.jpg", "/iphone.jpg", "img/iphone.jpg" → "/public/iphone.jpg"
       const fname = raw.split(/[\\/]/).pop();
       return fname ? "/public/" + fname : "";
     } catch (e) {
-      console.warn("fixImageUrl error:", e);
       return "";
     }
   }
 
-  // Remove cart items whose products no longer exist
   async function sanitizeCart() {
     try {
       let cart = JSON.parse(localStorage.getItem("cart") || "[]");
@@ -55,10 +47,7 @@ $(function () {
       cart = cart.map((it) => ({ id: String(it.id), qty: Number(it.qty) || 1 }));
 
       const resp = await fetch(API_BASE + "/getproducts");
-      if (!resp.ok) {
-        console.warn("sanitizeCart: /getproducts returned", resp.status);
-        return;
-      }
+      if (!resp.ok) return;
       const products = await resp.json();
 
       const valid = new Set();
@@ -68,17 +57,14 @@ $(function () {
       });
 
       const filtered = cart.filter((it) => valid.has(String(it.id)));
-
       if (filtered.length !== cart.length) {
-        console.info("sanitizeCart: removed invalid cart items");
         localStorage.setItem("cart", JSON.stringify(filtered));
       }
     } catch (err) {
-      console.warn("sanitizeCart error (ignored):", err);
+      // ignore
     }
   }
 
-  // Save cart for session + per-user
   function saveCartToLocalAndUser(cart) {
     try {
       const arr = Array.isArray(cart) ? cart : [];
@@ -88,11 +74,10 @@ $(function () {
         localStorage.setItem("cart_" + uid, JSON.stringify(arr));
       }
     } catch (e) {
-      console.warn("saveCartToLocalAndUser error:", e);
+      // ignore
     }
   }
 
-  // Load cart, preferring per-user cart
   function loadCartForCurrentUser() {
     try {
       const uid = getCurrentUserId();
@@ -102,12 +87,10 @@ $(function () {
       }
       return JSON.parse(localStorage.getItem("cart") || "[]");
     } catch (e) {
-      console.warn("loadCartForCurrentUser error:", e);
       return [];
     }
   }
 
-  // Show cart item count in navbar
   function updateCartCount() {
     try {
       const cart = loadCartForCurrentUser();
@@ -122,12 +105,10 @@ $(function () {
         $("#btnCart").text("Cart(" + total + ")");
       }
     } catch (err) {
-      console.error("updateCartCount error:", err);
       if ($("#cartCount").length) $("#cartCount").text(0);
     }
   }
 
-  // Run cart clean-up once on load
   sanitizeCart().then(function () {
     updateCartCount();
   });
@@ -190,8 +171,7 @@ $(function () {
                   $("#bodyContainer").html(resp2);
                 });
               })
-              .catch(function (err) {
-                console.error("Register error:", err);
+              .catch(function () {
                 alert("Registration failed");
               });
           });
@@ -199,7 +179,7 @@ $(function () {
     });
 
   /* =========================
-   * Login helper – uses POST /login
+   * Login helper
    * ======================= */
 
   function attachLoginHandler(onSuccess) {
@@ -238,7 +218,7 @@ $(function () {
               const per = localStorage.getItem("cart_" + uid);
               if (per) localStorage.setItem("cart", per);
             } catch (e) {
-              console.warn("restore cart error:", e);
+              // ignore
             }
 
             updateCartCount();
@@ -253,8 +233,7 @@ $(function () {
               });
             }
           })
-          .catch(function (err) {
-            console.error("Login fetch error:", err);
+          .catch(function () {
             alert("Login error");
           });
       });
@@ -272,9 +251,7 @@ $(function () {
           $("#bodyContainer").html(resp);
           attachLoginHandler();
         })
-        .catch(function (err) {
-          console.error("Load login.html error:", err);
-        });
+        .catch(function () {});
     });
 
   /* =========================
@@ -292,7 +269,7 @@ $(function () {
           localStorage.setItem("cart_" + uid, JSON.stringify(cart));
         }
       } catch (e) {
-        /* ignore */
+        // ignore
       }
 
       $.removeCookie("userid", { path: "/" });
@@ -309,9 +286,7 @@ $(function () {
           $("#bodyContainer").html(resp);
           attachLoginHandler();
         })
-        .catch(function (err) {
-          console.error("Load login.html error:", err);
-        });
+        .catch(function () {});
     });
 
   /* =========================
@@ -333,9 +308,7 @@ $(function () {
           $("#bodyContainer").html(resp);
           loadProfilePage();
         })
-        .catch(function (err) {
-          console.error("Load profile.html error:", err);
-        });
+        .catch(function () {});
     });
 
   /* =========================
@@ -394,14 +367,7 @@ $(function () {
       }
     });
 
-  // Footer quick-links
-  $("#navCategoriesFooter")
-    .off("click")
-    .on("click", function (e) {
-      e.preventDefault();
-      $("#btnNavCategories").click();
-    });
-
+  // Footer links
   $("#navShopF")
     .off("click")
     .on("click", function (e) {
@@ -417,7 +383,7 @@ $(function () {
     });
 
   /* =========================
-   * My Orders (LIST + DETAILS)
+   * Orders (list + detail)
    * ======================= */
 
   function renderOrderDetails(order) {
@@ -614,8 +580,7 @@ $(function () {
             renderOrderDetails(order);
           });
       })
-      .catch(function (err) {
-        console.error("showOrders error:", err);
+      .catch(function () {
         $("#bodyContainer").html(
           '<div class="p-4 text-danger">Error loading orders.</div>'
         );
@@ -675,8 +640,6 @@ $(function () {
           });
 
         if (missingIds.length) {
-          console.warn("Missing product in cart, removing:", missingIds);
-
           let newCart;
           try {
             newCart = loadCartForCurrentUser();
@@ -785,8 +748,9 @@ $(function () {
             const id = String($(this).data("id"));
             let c = loadCartForCurrentUser();
             c.forEach(function (it) {
-              if (String(it.id) === id)
+              if (String(it.id) === id) {
                 it.qty = Math.max(1, (it.qty || 1) - 1);
+              }
             });
             saveCartToLocalAndUser(c);
             updateCartCount();
@@ -926,27 +890,28 @@ $(function () {
                     );
                   });
               } else {
-                alert(
-                  "Unable to create order: " +
-                    (createResp && createResp.message
-                      ? createResp.message
-                      : "Unknown error")
-                );
-              }
-            } catch (err) {
-              console.error("Checkout error:", err);
-              alert("Error during checkout. See console for details.");
-            }
-          });
-      })
-      .catch(function (err) {
-        console.error("Failed to load products for cart:", err);
-        $("#bodyContainer").html(
-          '<div class="p-4 text-danger">Unable to load cart items</div>'
-        );
+            alert(
+              "Unable to create order: " +
+                (createResp && createResp.message
+                  ? createResp.message
+                  : "Unknown error")
+            );
+          }
+        } catch (err) {
+          console.error("Checkout error:", err);
+          alert("Error during checkout. See console for details.");
+        }
       });
+  })
+    .catch(function (err) {
+      console.error("Failed to load products for cart:", err);
+      $("#bodyContainer").html(
+        '<div class="p-4 text-danger">Unable to load cart items</div>'
+      );
+    });
   }
 
+  // Cart button → show cart
   $("#btnCart")
     .off("click")
     .on("click", function (e) {
@@ -1136,7 +1101,7 @@ $(function () {
       return;
     }
 
-    // back button
+    // Back button
     $("#btnBackFromProfile")
       .off("click")
       .on("click", function () {
@@ -1146,7 +1111,7 @@ $(function () {
         });
       });
 
-    // fetch profile data
+    // Fetch profile data
     $.ajax({
       method: "GET",
       url: API_BASE + "/customers/" + encodeURIComponent(uid),
@@ -1181,7 +1146,7 @@ $(function () {
           $("#DateOfBirth").val("");
         }
 
-        // update click handler
+        // Update click handler
         $("#btnUpdateProfile")
           .off("click")
           .on("click", function () {
@@ -1214,14 +1179,12 @@ $(function () {
             })
               .then(function (r) {
                 if (!r || r.success === false) {
-                  alert((r && r.message) || "Update failed");
+                  alert((r && r.message) || "Profile update failed.");
                   return;
                 }
 
-                alert(r.message || "Profile updated successfully");
-
-                // password field clear
-                $("#Password").val("");
+                alert(r.message || "Profile updated successfully.");
+                $("#Password").val(""); // clear password box
               })
               .catch(function (err) {
                 console.error("Profile update error:", err);
@@ -1365,10 +1328,18 @@ $(function () {
       if (perCart) {
         localStorage.setItem("cart", perCart);
       }
+      $("#user").text(uid);
+      $("#btnSignout").text("Signout");
     }
   } catch (e) {
-    /* ignore */
+    // ignore
   }
 
   updateCartCount();
+
+  // Footer year
+  const yearSpan = document.getElementById("year");
+  if (yearSpan) {
+    yearSpan.textContent = new Date().getFullYear();
+  }
 });
