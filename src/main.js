@@ -3,6 +3,7 @@
 
 // Backend base URL
 const API_BASE =
+import.meta.env.VITE_API_BASE ||
   "https://shopping-backend-jb5p.onrender.com";
 
 $(function () {
