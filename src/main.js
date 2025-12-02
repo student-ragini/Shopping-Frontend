@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 /* global $, document */
 
-// 👇 Backend base URL
+// 👇 Backend base URL 
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
   "https://shopping-backend-jb5p.onrender.com";
@@ -629,7 +629,7 @@ $(function () {
       showOrders();
     });
 
-  /* =========================
+ /* =========================
    * Cart display + checkout
    * ======================= */
 
@@ -918,12 +918,13 @@ $(function () {
                   .off("click")
                   .on("click", function (e) {
                     e.preventDefault();
-                    $.ajax({ method: "GET", url: "/products.html" }).then(
-                      function (resp) {
-                        $("#bodyContainer").html(resp);
-                        getProducts();
-                      }
-                    );
+                    $.ajax({
+                      method: "GET",
+                      url: "/products.html",
+                    }).then(function (resp) {
+                      $("#bodyContainer").html(resp);
+                      getProducts();
+                    });
                   });
               } else {
                 alert(
@@ -1219,9 +1220,7 @@ $(function () {
                 }
 
                 alert(r.message || "Profile updated successfully");
-
-                // password field clear
-                $("#Password").val("");
+                $("#Password").val(""); // clear password
               })
               .catch(function (err) {
                 console.error("Profile update error:", err);
