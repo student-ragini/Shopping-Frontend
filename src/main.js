@@ -290,15 +290,27 @@ $(function () {
     });
 
  /* =========================
- * Nav: Profile
- * ======================= */
+   * Nav: Profile
+   * ======================= */
 
-$("#btnNavProfile")
-  .off("click")
-  .on("click", function (e) {
-    e.preventDefault();
-    loadProfilePage();
-  });
+  $("#btnNavProfile")
+    .off("click")
+    .on("click", function () {
+      const uid = getCurrentUserId();
+      if (!uid) {
+        alert("Please login to view your profile.");
+        $("#btnNavLogin").click();
+        return;
+      }
+
+      $.ajax({ method: "GET", url: "/profile.html" })
+        .then(function (resp) {
+          $("#bodyContainer").html(resp);
+          loadProfilePage();
+        })
+        .catch(function () {});
+    });
+
 
   /* =========================
    * Nav: Shop
@@ -1078,7 +1090,9 @@ $("#btnNavProfile")
       });
   }
 
-/* -------------------  Profile page - load & update  ------------------- */
+ /* =========================
+   * Profile page – load & update
+   * ======================= */
 function loadProfilePage() {
   const uid = getCurrentUserId();
   if (!uid) {
@@ -1087,14 +1101,14 @@ function loadProfilePage() {
     return;
   }
 
-  // 1) Pehle profile.html load karo
+  // 1) Profile HTML load
   $.ajax({ method: "GET", url: "/profile.html" }).then(function (html) {
     $("#bodyContainer").html(html);
 
-    // UserId field me kam se kam uid dikha do
+    // userId 
     $("#UserId").val(uid);
 
-    // 2) Ab backend se profile data lao
+    // 2) Backend  customer data
     $.ajax({
       method: "GET",
       url: `${API_BASE}/customers/${encodeURIComponent(uid)}`,
@@ -1109,19 +1123,21 @@ function loadProfilePage() {
 
         const c = resp.customer;
 
-        $("#UserId").val(c.userId || "");
-        $("#FirstName").val(c.firstName || "");
-        $("#LastName").val(c.lastName || "");
-        $("#Email").val(c.email || "");
-        $("#Gender").val(c.gender || "");
-        $("#Address").val(c.address || "");
-        $("#PostalCode").val(c.postalCode || "");
-        $("#State").val(c.state || "");
-        $("#Country").val(c.country || "");
-        $("#Mobile").val(c.mobile || "");
+        
+        $("#UserId").val(c.UserId || "");
+        $("#FirstName").val(c.FirstName || "");
+        $("#LastName").val(c.LastName || "");
+        $("#Email").val(c.Email || "");
+        $("#Gender").val(c.Gender || "");
+        $("#Address").val(c.Address || "");
+        $("#PostalCode").val(c.PostalCode || "");
+        $("#State").val(c.State || "");
+        $("#Country").val(c.Country || "");
+        $("#Mobile").val(c.Mobile || "");
 
-        if (c.dateOfBirth) {
-          const dt = new Date(c.dateOfBirth);
+        // DateOfBirth → yyyy-mm-dd
+        if (c.DateOfBirth) {
+          const dt = new Date(c.DateOfBirth);
           const yyyy = dt.getFullYear();
           const mm = String(dt.getMonth() + 1).padStart(2, "0");
           const dd = String(dt.getDate()).padStart(2, "0");
@@ -1133,7 +1149,7 @@ function loadProfilePage() {
         alert("Unable to load profile info.");
       });
 
-    // 3) Update Profile button
+    // 3) Update button 
     $("#btnUpdateProfile")
       .off("click")
       .on("click", function (e) {
@@ -1169,7 +1185,7 @@ function loadProfilePage() {
             console.log("PROFILE UPDATE →", up);
             if (up && up.success) {
               alert(up.message || "Profile updated successfully.");
-              $("#Password").val(""); // password box clear
+              $("#Password").val("");
             } else {
               alert("Profile update failed. Please try again.");
             }
@@ -1180,7 +1196,7 @@ function loadProfilePage() {
           });
       });
 
-    // 4) Back to Shop button
+    // 4) Back button 
     $("#btnBackFromProfile")
       .off("click")
       .on("click", function () {
@@ -1191,7 +1207,6 @@ function loadProfilePage() {
       });
   });
 }
-
   /* =========================
    * Product detail page
    * ======================= */
