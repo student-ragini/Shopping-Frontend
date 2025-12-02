@@ -404,10 +404,22 @@ $(function () {
    * Nav: Profile
    * ======================= */
 
-  $("#btnNavProfile")
+ $("#btnNavProfile")
     .off("click")
     .on("click", function () {
-      loadProfilePage();
+      const uid = getCurrentUserId();
+      if (!uid) {
+        alert("Please login to view your profile.");
+        $("#btnNavLogin").click();
+        return;
+      }
+
+      $.ajax({ method: "GET", url: "/profile.html" })
+        .then(function (resp) {
+          $("#bodyContainer").html(resp);
+          loadProfilePage();
+        })
+        .catch(function () {});
     });
 
   /* =========================
