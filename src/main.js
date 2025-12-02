@@ -289,27 +289,16 @@ $(function () {
         .catch(function () {});
     });
 
-  /* =========================
-   * Nav: Profile
-   * ======================= */
+ /* =========================
+ * Nav: Profile
+ * ======================= */
 
-  $("#btnNavProfile")
-    .off("click")
-    .on("click", function () {
-      const uid = getCurrentUserId();
-      if (!uid) {
-        alert("Please login to view your profile.");
-        $("#btnNavLogin").click();
-        return;
-      }
-
-      $.ajax({ method: "GET", url: "/profile.html" })
-        .then(function (resp) {
-          $("#bodyContainer").html(resp);
-          loadProfilePage();
-        })
-        .catch(function () {});
-    });
+$("#btnNavProfile")
+  .off("click")
+  .on("click", function (e) {
+    e.preventDefault();
+    loadProfilePage();
+  });
 
   /* =========================
    * Nav: Shop
@@ -1089,7 +1078,7 @@ $(function () {
       });
   }
 
- /* -------------------  Profile page - load & update  ------------------- */
+/* -------------------  Profile page - load & update  ------------------- */
 function loadProfilePage() {
   const uid = getCurrentUserId();
   if (!uid) {
@@ -1098,50 +1087,59 @@ function loadProfilePage() {
     return;
   }
 
-  // Load profile HTML first
+  // 1) Pehle profile.html load karo
   $.ajax({ method: "GET", url: "/profile.html" }).then(function (html) {
     $("#bodyContainer").html(html);
 
-    // Once page loaded → now call backend API to get user profile
-    fetch(`${API_BASE}/customers/${uid}`)
-      .then((r) => r.json())
-      .then((resp) => {
+    // UserId field me kam se kam uid dikha do
+    $("#UserId").val(uid);
+
+    // 2) Ab backend se profile data lao
+    $.ajax({
+      method: "GET",
+      url: `${API_BASE}/customers/${encodeURIComponent(uid)}`,
+    })
+      .done(function (resp) {
         console.log("PROFILE LOAD →", resp);
 
-        if (resp && resp.success && resp.customer) {
-          const c = resp.customer;
+        if (!resp || resp.success === false || !resp.customer) {
+          console.warn("No customer data in response");
+          return;
+        }
 
-          $("#UserId").val(c.userId || "");
-          $("#FirstName").val(c.firstName || "");
-          $("#LastName").val(c.lastName || "");
-          $("#Email").val(c.email || "");
-          $("#Gender").val(c.gender || "");
-          $("#Address").val(c.address || "");
-          $("#PostalCode").val(c.postalCode || "");
-          $("#State").val(c.state || "");
-          $("#Country").val(c.country || "");
-          $("#Mobile").val(c.mobile || "");
+        const c = resp.customer;
 
-          // Convert date format → yyyy-mm-dd
-          if (c.dateOfBirth) {
-            const dt = new Date(c.dateOfBirth);
-            $("#DateOfBirth").val(
-              `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(
-                2,
-                "0"
-              )}-${String(dt.getDate()).padStart(2, "0")}`
-            );
-          }
+        $("#UserId").val(c.userId || "");
+        $("#FirstName").val(c.firstName || "");
+        $("#LastName").val(c.lastName || "");
+        $("#Email").val(c.email || "");
+        $("#Gender").val(c.gender || "");
+        $("#Address").val(c.address || "");
+        $("#PostalCode").val(c.postalCode || "");
+        $("#State").val(c.state || "");
+        $("#Country").val(c.country || "");
+        $("#Mobile").val(c.mobile || "");
+
+        if (c.dateOfBirth) {
+          const dt = new Date(c.dateOfBirth);
+          const yyyy = dt.getFullYear();
+          const mm = String(dt.getMonth() + 1).padStart(2, "0");
+          const dd = String(dt.getDate()).padStart(2, "0");
+          $("#DateOfBirth").val(`${yyyy}-${mm}-${dd}`);
         }
       })
-      .catch((err) => console.error("PROFILE LOAD ERROR:", err));
+      .fail(function (err) {
+        console.error("PROFILE LOAD ERROR:", err);
+        alert("Unable to load profile info.");
+      });
 
-    /* ---------- Update button ---------- */
+    // 3) Update Profile button
     $("#btnUpdateProfile")
       .off("click")
       .on("click", function (e) {
         e.preventDefault();
-        const uid2 = $("#UserId").val();
+
+        const uid2 = $("#UserId").val() || uid;
 
         const payload = {
           firstName: $("#FirstName").val(),
@@ -1156,33 +1154,33 @@ function loadProfilePage() {
           dateOfBirth: $("#DateOfBirth").val() || null,
         };
 
-        // Password → only send if entered
-        if ($("#Password").val().trim() !== "") {
-          payload.password = $("#Password").val().trim();
+        const newPwd = $("#Password").val().trim();
+        if (newPwd !== "") {
+          payload.password = newPwd;
         }
 
-        fetch(`${API_BASE}/customers/${uid2}`, {
+        $.ajax({
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          url: `${API_BASE}/customers/${encodeURIComponent(uid2)}`,
+          contentType: "application/json",
+          data: JSON.stringify(payload),
         })
-          .then((r) => r.json())
-          .then((up) => {
-            console.log("PROFILE UPDATE RESPONSE →", up);
+          .done(function (up) {
+            console.log("PROFILE UPDATE →", up);
             if (up && up.success) {
               alert(up.message || "Profile updated successfully.");
-              $("#Password").val(""); // clear password box
+              $("#Password").val(""); // password box clear
             } else {
               alert("Profile update failed. Please try again.");
             }
           })
-          .catch((err) => {
+          .fail(function (err) {
             console.error("PROFILE UPDATE ERROR:", err);
-            alert("Profile update failed. Please try again.");
+            alert("Profile update failed, please try again.");
           });
       });
 
-    /* ---------- Back button ---------- */
+    // 4) Back to Shop button
     $("#btnBackFromProfile")
       .off("click")
       .on("click", function () {
