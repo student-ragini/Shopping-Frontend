@@ -293,107 +293,135 @@ $(function () {
         .catch(function () {});
     });
 
-  /* =========================
-   * Profile page - load & update
-   * ======================= */
+ /* =========================
+ * Profile page - load & update
+ * ======================= */
 
-  function loadProfilePage() {
-    const uid = getCurrentUserId();
-    if (!uid) {
-      alert("Please login first.");
-      $("#btnNavLogin").click();
-      return;
-    }
+function loadProfilePage() {
+  const uid = getCurrentUserId();
+  if (!uid) {
+    alert("Please login first.");
+    $("#btnNavLogin").click();
+    return;
+  }
 
-    // ---- 1) Backend se profile data lao ----
-    fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
-      .then((r) => r.json())
-      .then((resp) => {
-        console.log("PROFILE LOAD →", resp);
+  // ---- 1) Backend se profile data lao ----
+  fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
+    .then((r) => r.json())
+    .then((resp) => {
+      console.log("PROFILE LOAD →", resp);
 
-        if (resp && resp.success && resp.customer) {
-          const c = resp.customer;
+      if (resp && resp.success && resp.customer) {
+        const c = resp.customer;
 
-          $("#UserId").val(c.UserId || c.userId || "");
-          $("#FirstName").val(c.FirstName || c.firstName || "");
-          $("#LastName").val(c.LastName || c.lastName || "");
-          $("#Email").val(c.Email || c.email || "");
-          $("#Gender").val(c.Gender || c.gender || "");
-          $("#Address").val(c.Address || c.address || "");
-          $("#PostalCode").val(c.PostalCode || c.postalCode || "");
-          $("#State").val(c.State || c.state || "");
-          $("#Country").val(c.Country || c.country || "");
-          $("#Mobile").val(c.Mobile || c.mobile || "");
+        $("#UserId").val(c.UserId || c.userId || "");
+        $("#FirstName").val(c.FirstName || c.firstName || "");
+        $("#LastName").val(c.LastName || c.lastName || "");
+        $("#Email").val(c.Email || c.email || "");
+        $("#Gender").val(c.Gender || c.gender || "");
+        $("#Address").val(c.Address || c.address || "");
+        $("#PostalCode").val(c.PostalCode || c.postalCode || "");
+        $("#State").val(c.State || c.state || "");
+        $("#Country").val(c.Country || c.country || "");
+        $("#Mobile").val(c.Mobile || c.mobile || "");
 
-          // DOB → yyyy-mm-dd
-          if (c.DateOfBirth || c.dateOfBirth) {
-            const dobStr = c.DateOfBirth || c.dateOfBirth;
-            const dt = new Date(dobStr);
-            if (!isNaN(dt.getTime())) {
-              const mm = String(dt.getMonth() + 1).padStart(2, "0");
-              const dd = String(dt.getDate()).padStart(2, "0");
-              $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
-            }
+        // DOB → yyyy-mm-dd
+        if (c.DateOfBirth || c.dateOfBirth) {
+          const dobStr = c.DateOfBirth || c.dateOfBirth;
+          const dt = new Date(dobStr);
+          if (!isNaN(dt.getTime())) {
+            const mm = String(dt.getMonth() + 1).padStart(2, "0");
+            const dd = String(dt.getDate()).padStart(2, "0");
+            $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
           }
         }
+      }
+    })
+    .catch((err) => console.error("PROFILE LOAD ERROR:", err));
+
+  // ---- 2) Update button ----
+  $("#btnUpdateProfile")
+    .off("click")
+    .on("click", function (e) {
+      e.preventDefault();
+
+      const uid2 = $("#UserId").val();
+
+      // Dono style ki keys bhej rahe hain (camelCase + PascalCase)
+      const payload = {
+        userId: uid2,
+        UserId: uid2,
+
+        firstName: $("#FirstName").val(),
+        FirstName: $("#FirstName").val(),
+
+        lastName: $("#LastName").val(),
+        LastName: $("#LastName").val(),
+
+        email: $("#Email").val(),
+        Email: $("#Email").val(),
+
+        gender: $("#Gender").val(),
+        Gender: $("#Gender").val(),
+
+        address: $("#Address").val(),
+        Address: $("#Address").val(),
+
+        postalCode: $("#PostalCode").val(),
+        PostalCode: $("#PostalCode").val(),
+
+        state: $("#State").val(),
+        State: $("#State").val(),
+
+        country: $("#Country").val(),
+        Country: $("#Country").val(),
+
+        mobile: $("#Mobile").val(),
+        Mobile: $("#Mobile").val(),
+
+        dateOfBirth: $("#DateOfBirth").val() || null,
+        DateOfBirth: $("#DateOfBirth").val() || null,
+      };
+
+      // password sirf jab likha ho
+      const pwd = $("#Password").val().trim();
+      if (pwd !== "") {
+        payload.password = pwd;
+        payload.Password = pwd;
+      }
+
+      $.ajax({
+        method: "PUT",
+        url: `${API_BASE}/customers/${encodeURIComponent(uid2)}`,
+        data: JSON.stringify(payload),
+        contentType: "application/json",
+        dataType: "json",
       })
-      .catch((err) => console.error("PROFILE LOAD ERROR:", err));
-
-    // ---- 2) Update button ----
-    $("#btnUpdateProfile")
-      .off("click")
-      .on("click", function (e) {
-        e.preventDefault();
-
-        const payload = {
-          UserId: $("#UserId").val(),
-          FirstName: $("#FirstName").val(),
-          LastName: $("#LastName").val(),
-          Email: $("#Email").val(),
-          Gender: $("#Gender").val(),
-          Address: $("#Address").val(),
-          PostalCode: $("#PostalCode").val(),
-          State: $("#State").val(),
-          Country: $("#Country").val(),
-          Mobile: $("#Mobile").val(),
-          DateOfBirth: $("#DateOfBirth").val() || null,
-        };
-
-        // password tabhi bhejna jab box me kuch ho
-        if ($("#Password").val().trim() !== "") {
-          payload.Password = $("#Password").val().trim();
-        }
-
-        $.ajax({
-          method: "POST",
-          url: API_BASE + "/updatecustomer",
-          data: payload,
+        .then(function (up) {
+          console.log("PROFILE UPDATE RESPONSE →", up);
+          if (up && up.success) {
+            alert(up.message || "Profile updated successfully.");
+            $("#Password").val(""); // clear password
+          } else {
+            alert(up.message || "Profile update failed. Please try again.");
+          }
         })
-          .then(function (up) {
-            console.log("PROFILE UPDATE RESPONSE →", up);
-            if (up && up.success) {
-              alert(up.message || "Profile updated successfully.");
-              $("#Password").val(""); // clear password
-            } else {
-              alert(up.message || "Profile update failed. Please try again.");
-            }
-          })
-          .catch(function (err) {
-            console.error("PROFILE UPDATE ERROR:", err);
-            alert("Profile update failed. Please try again.");
-          });
-      });
-
-    // ---- 3) Back button ----
-    $("#btnBackFromProfile")
-      .off("click")
-      .on("click", function () {
-        $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
-          $("#bodyContainer").html(p);
-          getProducts();
+        .catch(function (err) {
+          console.error("PROFILE UPDATE ERROR:", err);
+          alert("Profile update failed. Please try again.");
         });
+    });
+
+  // ---- 3) Back button ----
+  $("#btnBackFromProfile")
+    .off("click")
+    .on("click", function () {
+      $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
+        $("#bodyContainer").html(p);
+        getProducts();
       });
-  }
+    });
+}
   
   /* =========================
    * Nav: Profile
