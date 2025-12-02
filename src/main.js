@@ -305,7 +305,7 @@ function loadProfilePage() {
     return;
   }
 
-  // ---- 1) Backend se profile data lao ----
+  // ---- 1) Backend se profile data lao (GET /customers/:UserId) ----
   fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
     .then((r) => r.json())
     .then((resp) => {
@@ -339,63 +339,38 @@ function loadProfilePage() {
     })
     .catch((err) => console.error("PROFILE LOAD ERROR:", err));
 
-  // ---- 2) Update button ----
+  // ---- 2) Update button (POST /updatecustomer) ----
   $("#btnUpdateProfile")
     .off("click")
     .on("click", function (e) {
       e.preventDefault();
 
-      const uid2 = $("#UserId").val();
+      const pwd = $("#Password").val().trim();
 
-      // Dono style ki keys bhej rahe hain (camelCase + PascalCase)
+      // yahi fields backend expect karta hai (PascalCase)
       const payload = {
-        userId: uid2,
-        UserId: uid2,
-
-        firstName: $("#FirstName").val(),
+        UserId: $("#UserId").val(),
         FirstName: $("#FirstName").val(),
-
-        lastName: $("#LastName").val(),
         LastName: $("#LastName").val(),
-
-        email: $("#Email").val(),
-        Email: $("#Email").val(),
-
-        gender: $("#Gender").val(),
-        Gender: $("#Gender").val(),
-
-        address: $("#Address").val(),
-        Address: $("#Address").val(),
-
-        postalCode: $("#PostalCode").val(),
-        PostalCode: $("#PostalCode").val(),
-
-        state: $("#State").val(),
-        State: $("#State").val(),
-
-        country: $("#Country").val(),
-        Country: $("#Country").val(),
-
-        mobile: $("#Mobile").val(),
-        Mobile: $("#Mobile").val(),
-
-        dateOfBirth: $("#DateOfBirth").val() || null,
         DateOfBirth: $("#DateOfBirth").val() || null,
+        Email: $("#Email").val(),
+        Gender: $("#Gender").val(),
+        Address: $("#Address").val(),
+        PostalCode: $("#PostalCode").val(),
+        State: $("#State").val(),
+        Country: $("#Country").val(),
+        Mobile: $("#Mobile").val(),
       };
 
-      // password sirf jab likha ho
-      const pwd = $("#Password").val().trim();
+      // password sirf tab bhejna jab likha ho
       if (pwd !== "") {
-        payload.password = pwd;
         payload.Password = pwd;
       }
 
       $.ajax({
-        method: "PUT",
-        url: `${API_BASE}/customers/${encodeURIComponent(uid2)}`,
-        data: JSON.stringify(payload),
-        contentType: "application/json",
-        dataType: "json",
+        method: "POST",
+        url: API_BASE + "/updatecustomer",
+        data: payload,            // normal form-data (JSON nahi)
       })
         .then(function (up) {
           console.log("PROFILE UPDATE RESPONSE →", up);
@@ -422,7 +397,7 @@ function loadProfilePage() {
       });
     });
 }
-  
+
   /* =========================
    * Nav: Profile
    * ======================= */
