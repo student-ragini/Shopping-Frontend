@@ -9,7 +9,7 @@ const API_BASE =
 $(function () {
   // Last loaded products (for search + sort)
   let currentProducts = [];
-  let currentProfileMongoId = null;
+  
 
   /* =========================
    * Helpers
