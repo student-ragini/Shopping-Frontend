@@ -3,7 +3,7 @@
 
 // Backend base URL
 const API_BASE =
-import.meta.env.VITE_API_BASE ||
+  import.meta.env.VITE_API_BASE ||
   "https://shopping-backend-jb5p.onrender.com";
 
 $(function () {
@@ -1089,109 +1089,109 @@ $(function () {
       });
   }
 
-  /* =========================
-   * Profile page – load & update
-   * ======================= */
-
-  function loadProfilePage() {
+ /* -------------------  Profile page - load & update  ------------------- */
+function loadProfilePage() {
   const uid = getCurrentUserId();
   if (!uid) {
-    alert("Please login again.");
+    alert("Please login first.");
     $("#btnNavLogin").click();
     return;
   }
 
-  $("#btnBackFromProfile")
-    .off("click")
-    .on("click", function () {
-      $.ajax({ method: "GET", url: "/products.html" }).then(function (resp) {
-        $("#bodyContainer").html(resp);
-        getProducts();
-      });
-    });
+  // Load profile HTML first
+  $.ajax({ method: "GET", url: "/profile.html" }).then(function (html) {
+    $("#bodyContainer").html(html);
 
-  // ---- PROFILE LOAD ----
-  $.ajax({
-    method: "GET",
-    url: API_BASE + "/customers/" + encodeURIComponent(uid),
-  })
-    .then(function (resp) {
-      if (!resp || resp.success === false || !resp.customer) {
-        alert(
-          (resp && resp.message) ||
-            "Unable to load profile. Please try again later."
-        );
-        return;
-      }
+    // Once page loaded → now call backend API to get user profile
+    fetch(`${API_BASE}/customers/${uid}`)
+      .then((r) => r.json())
+      .then((resp) => {
+        console.log("PROFILE LOAD →", resp);
 
-      const c = resp.customer;
+        if (resp && resp.success && resp.customer) {
+          const c = resp.customer;
 
-      $("#UserId").val(c.UserId || uid).prop("disabled", true);
-      $("#FirstName").val(c.FirstName || "");
-      $("#LastName").val(c.LastName || "");
-      $("#Email").val(c.Email || "");
-      $("#Gender").val(c.Gender || "");
-      $("#Address").val(c.Address || "");
-      $("#PostalCode").val(c.PostalCode || "");
-      $("#State").val(c.State || "");
-      $("#Country").val(c.Country || "");
-      $("#Mobile").val(c.Mobile || "");
+          $("#UserId").val(c.userId || "");
+          $("#FirstName").val(c.firstName || "");
+          $("#LastName").val(c.lastName || "");
+          $("#Email").val(c.email || "");
+          $("#Gender").val(c.gender || "");
+          $("#Address").val(c.address || "");
+          $("#PostalCode").val(c.postalCode || "");
+          $("#State").val(c.state || "");
+          $("#Country").val(c.country || "");
+          $("#Mobile").val(c.mobile || "");
 
-      if (c.DateOfBirth) {
-        const d = new Date(c.DateOfBirth);
-        const iso = d.toISOString().slice(0, 10);
-        $("#DateOfBirth").val(iso);
-      } else {
-        $("#DateOfBirth").val("");
-      }
-
-      // ---- PROFILE UPDATE ----
-      $("#btnUpdateProfile")
-        .off("click")
-        .on("click", function () {
-          const payload = {
-            FirstName: $("#FirstName").val().trim(),
-            LastName: $("#LastName").val().trim(),
-            DateOfBirth: $("#DateOfBirth").val(),
-            Email: $("#Email").val().trim(),
-            Gender: $("#Gender").val(),
-            Address: $("#Address").val().trim(),
-            PostalCode: $("#PostalCode").val().trim(),
-            State: $("#State").val().trim(),
-            Country: $("#Country").val().trim(),
-            Mobile: $("#Mobile").val().trim(),
-          };
-
-          const newPwd = $("#Password").val();
-          if (newPwd && newPwd.trim() !== "") {
-            if (newPwd.trim().length < 6) {
-              alert("New password must be at least 6 characters.");
-              return;
-            }
-            payload.Password = newPwd.trim();
+          // Convert date format → yyyy-mm-dd
+          if (c.dateOfBirth) {
+            const dt = new Date(c.dateOfBirth);
+            $("#DateOfBirth").val(
+              `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(
+                2,
+                "0"
+              )}-${String(dt.getDate()).padStart(2, "0")}`
+            );
           }
+        }
+      })
+      .catch((err) => console.error("PROFILE LOAD ERROR:", err));
 
-          $.ajax({
-            method: "PUT",
-            url: API_BASE + "/customers/" + encodeURIComponent(uid),
-            data: payload,
-          })
-            .then(function (r) {
-              if (!r || r.success === false) {
-                alert((r && r.message) || "Profile update failed.");
-                return;
-              }
-              alert(r.message || "Profile updated successfully.");
-              $("#Password").val("");
-            })
-            .catch(function () {
+    /* ---------- Update button ---------- */
+    $("#btnUpdateProfile")
+      .off("click")
+      .on("click", function (e) {
+        e.preventDefault();
+        const uid2 = $("#UserId").val();
+
+        const payload = {
+          firstName: $("#FirstName").val(),
+          lastName: $("#LastName").val(),
+          email: $("#Email").val(),
+          gender: $("#Gender").val(),
+          address: $("#Address").val(),
+          postalCode: $("#PostalCode").val(),
+          state: $("#State").val(),
+          country: $("#Country").val(),
+          mobile: $("#Mobile").val(),
+          dateOfBirth: $("#DateOfBirth").val() || null,
+        };
+
+        // Password → only send if entered
+        if ($("#Password").val().trim() !== "") {
+          payload.password = $("#Password").val().trim();
+        }
+
+        fetch(`${API_BASE}/customers/${uid2}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then((r) => r.json())
+          .then((up) => {
+            console.log("PROFILE UPDATE RESPONSE →", up);
+            if (up && up.success) {
+              alert(up.message || "Profile updated successfully.");
+              $("#Password").val(""); // clear password box
+            } else {
               alert("Profile update failed. Please try again.");
-            });
+            }
+          })
+          .catch((err) => {
+            console.error("PROFILE UPDATE ERROR:", err);
+            alert("Profile update failed. Please try again.");
+          });
+      });
+
+    /* ---------- Back button ---------- */
+    $("#btnBackFromProfile")
+      .off("click")
+      .on("click", function () {
+        $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
+          $("#bodyContainer").html(p);
+          getProducts();
         });
-    })
-    .catch(function () {
-      alert("Unable to load profile right now.");
-    });
+      });
+  });
 }
 
   /* =========================
