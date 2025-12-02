@@ -9,6 +9,7 @@ const API_BASE =
 $(function () {
   // Last loaded products (for search + sort)
   let currentProducts = [];
+  let currentProfileMongoId = null;
 
   /* =========================
    * Helpers
@@ -297,6 +298,9 @@ $(function () {
  * Profile page - load & update
  * ======================= */
 
+// page ke top pe (currentProducts ke paas) ek global var bhi add karna hai:
+// let currentProfileMongoId = null;
+
 function loadProfilePage() {
   const uid = getCurrentUserId();
   if (!uid) {
@@ -313,6 +317,9 @@ function loadProfilePage() {
 
       if (resp && resp.success && resp.customer) {
         const c = resp.customer;
+
+        // Mongo _id ko global me save karo (update ke liye)
+        currentProfileMongoId = c._id || null;
 
         $("#UserId").val(c.UserId || c.userId || "");
         $("#FirstName").val(c.FirstName || c.firstName || "");
@@ -339,15 +346,19 @@ function loadProfilePage() {
     })
     .catch((err) => console.error("PROFILE LOAD ERROR:", err));
 
-  // ---- 2) Update button (POST /updatecustomer) ----
+  // ---- 2) Update button (PUT /customers/:_id) ----
   $("#btnUpdateProfile")
     .off("click")
     .on("click", function (e) {
       e.preventDefault();
 
+      if (!currentProfileMongoId) {
+        alert("Cannot update profile: internal id missing.");
+        return;
+      }
+
       const pwd = $("#Password").val().trim();
 
-      // yahi fields backend expect karta hai (PascalCase)
       const payload = {
         UserId: $("#UserId").val(),
         FirstName: $("#FirstName").val(),
@@ -362,15 +373,19 @@ function loadProfilePage() {
         Mobile: $("#Mobile").val(),
       };
 
-      // password sirf tab bhejna jab likha ho
       if (pwd !== "") {
         payload.Password = pwd;
       }
 
       $.ajax({
-        method: "POST",
-        url: API_BASE + "/updatecustomer",
-        data: payload,            // normal form-data (JSON nahi)
+        method: "PUT",
+        url:
+          API_BASE +
+          "/customers/" +
+          encodeURIComponent(currentProfileMongoId), // yaha _id ja raha hai
+        data: JSON.stringify(payload),
+        contentType: "application/json",
+        dataType: "json",
       })
         .then(function (up) {
           console.log("PROFILE UPDATE RESPONSE →", up);
@@ -378,7 +393,10 @@ function loadProfilePage() {
             alert(up.message || "Profile updated successfully.");
             $("#Password").val(""); // clear password
           } else {
-            alert(up.message || "Profile update failed. Please try again.");
+            alert(
+              (up && up.message) ||
+                "Profile update failed. Please try again."
+            );
           }
         })
         .catch(function (err) {
