@@ -4,7 +4,7 @@
 // Backend base URL
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
-  "https://shopping-backend-jb5-tomers.onrender.com";
+  "https://shopping-backend-jb5p.onrender.com";
 
 $(function () {
   // Last loaded products (for search + sort)
