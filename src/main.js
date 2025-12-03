@@ -2,12 +2,13 @@
 /* global $, document */
 
 // Backend base URL
+// Use runtime window.__API_BASE__ if set (avoids editors complaining about import.meta)
+// Fallback to the deployed backend you were using.
 const API_BASE =
-  import.meta.env.VITE_API_BASE ||
+  (typeof window !== "undefined" && window.__API_BASE__) ||
   "https://shopping-backend-jb5p.onrender.com";
 
 $(function () {
-  // Last loaded products (for search + sort)
   let currentProducts = [];
 
   /* =========================
@@ -467,8 +468,9 @@ $(function () {
                 payload.password = pwd;
               }
 
-              console.log("PROFILE UPDATE -> PUT /customers/" + encodeURIComponent(uidInput), payload);
+              console.log("PROFILE UPDATE -> TRY PUT /customers/" + encodeURIComponent(uidInput), payload);
 
+              // First try the canonical PUT endpoint
               fetch(API_BASE + "/customers/" + encodeURIComponent(uidInput), {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -476,6 +478,7 @@ $(function () {
               })
                 .then((r) => {
                   if (!r.ok) {
+                    // capture status code & body (if any)
                     return r.json().then((j) => {
                       throw { status: r.status, body: j };
                     }).catch(() => {
@@ -485,7 +488,7 @@ $(function () {
                   return r.json();
                 })
                 .then((up) => {
-                  console.log("PROFILE UPDATE RESPONSE →", up);
+                  console.log("PROFILE UPDATE RESPONSE (PUT) →", up);
 
                   if (up && up.success) {
                     alert(up.message || "Profile updated successfully.");
@@ -495,11 +498,40 @@ $(function () {
                   }
                 })
                 .catch((err) => {
-                  console.error("PROFILE UPDATE ERROR:", err);
+                  console.warn("PUT /customers/:userId failed:", err);
+
+                  // If PUT returned 404 or server didn't accept, try legacy POST /updatecustomer
                   if (err && err.status === 404) {
-                    alert("Profile update failed: user not found (404). Check that your userid matches backend keys.");
+                    console.log("Attempting fallback POST /updatecustomer with payload");
+                    fetch(API_BASE + "/updatecustomer", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload),
+                    })
+                      .then((r2) => {
+                        return r2.json().catch(() => ({}));
+                      })
+                      .then((resp2) => {
+                        console.log("PROFILE UPDATE RESPONSE (POST fallback) →", resp2);
+                        if (resp2 && resp2.success) {
+                          alert(resp2.message || "Profile updated successfully (fallback).");
+                          $("#Password").val("");
+                        } else {
+                          alert((resp2 && resp2.message) || "Profile update failed (fallback). Please contact admin.");
+                        }
+                      })
+                      .catch((e2) => {
+                        console.error("Fallback POST /updatecustomer failed:", e2);
+                        alert("Profile update failed. Please try again later.");
+                      });
                   } else {
-                    alert("Profile update failed. Please try again.");
+                    // non-404 or other error
+                    console.error("PROFILE UPDATE ERROR:", err);
+                    if (err && err.status === 404) {
+                      alert("Profile update failed: user not found (404). Check that your userid matches backend keys.");
+                    } else {
+                      alert("Profile update failed. Please try again.");
+                    }
                   }
                 });
             });
