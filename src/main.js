@@ -294,7 +294,7 @@ $(function () {
     });
 
  /* =========================
-   * Profile page - load & update (robust)
+   * Profile page - load & update (use POST /updatecustomer fallback)
    * ======================= */
 
   function loadProfilePage() {
@@ -305,23 +305,19 @@ $(function () {
       return;
     }
 
-    // keep loaded customer id (prefer _id from DB)
+    // Will store best id returned by backend (prefer _id)
     let loadedCustomerId = null;
 
-    // 1) Load profile HTML
+    // 1) Load profile.html into container
     $.ajax({ method: "GET", url: "/profile.html" })
       .then(function (html) {
         $("#bodyContainer").html(html);
 
-        // 2) Fetch the customer data from backend
+        // 2) Fetch customer data from backend
         fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
           .then((r) => {
-            // debug: show HTTP status
             console.log("PROFILE LOAD HTTP STATUS:", r.status);
-            return r.json().catch((e) => {
-              console.error("Failed to parse profile JSON", e);
-              return null;
-            });
+            return r.json().catch(() => null);
           })
           .then((resp) => {
             console.log("PROFILE LOAD →", resp);
@@ -329,11 +325,10 @@ $(function () {
             if (resp && resp.success && resp.customer) {
               const c = resp.customer;
 
-              // store best id for updates: prefer Mongo _id, then id, then userId/UserId, fallback to cookie uid
-              loadedCustomerId =
-                c._id || c.id || c.UserId || c.userId || uid || null;
+              // prefer Mongo _id if present, otherwise other ids
+              loadedCustomerId = c._id || c.id || c.UserId || c.userId || uid;
 
-              // fill form fields (support mixed casing from backend)
+              // fill form supporting varied key casing
               $("#UserId").val(c.UserId || c.userId || "");
               $("#FirstName").val(c.FirstName || c.firstName || "");
               $("#LastName").val(c.LastName || c.lastName || "");
@@ -345,7 +340,6 @@ $(function () {
               $("#Country").val(c.Country || c.country || "");
               $("#Mobile").val(c.Mobile || c.mobile || "");
 
-              // DOB → yyyy-mm-dd
               const dobVal = c.DateOfBirth || c.dateOfBirth || null;
               if (dobVal) {
                 const dt = new Date(dobVal);
@@ -356,25 +350,20 @@ $(function () {
                 }
               }
             } else {
-              // If backend returned something but success false, show message
               console.warn("Profile load returned no customer or success=false", resp);
-              // we still allow user to try update — but better to alert
-              // alert("Unable to load profile data.");
             }
           })
           .catch((err) => {
             console.error("PROFILE LOAD ERROR:", err);
-            // optional: alert user
-            // alert("Failed to load profile. Check console for details.");
           });
 
-        // 3) Attach Update button handler
+        // 3) Update handler — use POST /updatecustomer (form-encoded) which matches many backends
         $("#btnUpdateProfile")
           .off("click")
           .on("click", function (e) {
             e.preventDefault();
 
-            // collect fields (trim where appropriate)
+            // collect values
             const uidField = ($("#UserId").val() || "").trim();
             const first = ($("#FirstName").val() || "").trim();
             const last = ($("#LastName").val() || "").trim();
@@ -388,25 +377,19 @@ $(function () {
             const dob = $("#DateOfBirth").val() || null;
             const pwd = ($("#Password").val() || "").trim();
 
-            // choose id to use for update:
-            // prefer loadedCustomerId (DB _id), otherwise use UserId field if it's present,
-            // finally fallback to cookie uid (getCurrentUserId()).
-            const idToUse =
-              loadedCustomerId || uidField || getCurrentUserId() || uid;
-
-            // Build payload with both naming styles (backend may expect different keys)
+            // prepare payload object (use keys backend may expect)
             const payload = {
-              // ids
+              // include identifier fields
+              _id: loadedCustomerId || undefined,
+              id: loadedCustomerId && String(loadedCustomerId),
               UserId: uidField || undefined,
               userId: uidField || undefined,
 
-              // name fields
+              // profile fields (both cases to increase compatibility)
               FirstName: first || undefined,
               firstName: first || undefined,
               LastName: last || undefined,
               lastName: last || undefined,
-
-              // other
               Email: email || undefined,
               email: email || undefined,
               Gender: gender || undefined,
@@ -430,86 +413,39 @@ $(function () {
               payload.password = pwd;
             }
 
-            console.log("Attempting profile update. idToUse:", idToUse, "payload:", payload);
+            console.log("PROFILE UPDATE: payload →", payload);
 
-            // Primary attempt: use PUT /customers/:idToUse
-            fetch(API_BASE + "/customers/" + encodeURIComponent(idToUse), {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            })
-              .then(async (r) => {
-                const status = r.status;
-                const data = await r.json().catch(() => null);
-                console.log("PROFILE UPDATE RESPONSE (PUT) status:", status, "body:", data);
-
-                if (r.ok && data && data.success) {
-                  alert(data.message || "Profile updated successfully.");
+            // Use jQuery $.ajax POST (default contentType = application/x-www-form-urlencoded)
+            // This matches older/backends that expect form-data instead of JSON body.
+            $.ajax({
+              method: "POST",
+              url: API_BASE + "/updatecustomer",
+              data: payload,
+              success: function (res) {
+                console.log("PROFILE UPDATE RESPONSE (POST):", res);
+                if (res && res.success) {
+                  alert(res.message || "Profile updated successfully.");
                   $("#Password").val("");
-                  return;
-                }
-
-                // If PUT failed with 404 or server says user not found,
-                // try legacy endpoint POST /updatecustomer (fallback).
-                const msg =
-                  (data && data.message) ||
-                  "Profile update attempt returned status " + status;
-
-                if (status === 404 || (data && /not found/i.test(String(msg)))) {
-                  console.warn("PUT returned 404 or not found; attempting fallback POST /updatecustomer");
-
-                  // fallback POST (older backend route)
-                  return fetch(API_BASE + "/updatecustomer", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                  })
-                    .then((r2) => r2.json().catch(() => null))
-                    .then((r2data) => {
-                      console.log("PROFILE UPDATE RESPONSE (POST fallback):", r2data);
-                      if (r2data && r2data.success) {
-                        alert(r2data.message || "Profile updated successfully (fallback).");
-                        $("#Password").val("");
-                        return;
-                      }
-                      // final failure
-                      alert((r2data && r2data.message) || "Profile update failed. See console for details.");
-                    })
-                    .catch((err2) => {
-                      console.error("Fallback update error:", err2);
-                      alert("Profile update failed (fallback). See console.");
-                    });
                 } else {
-                  // PUT failed but not a not-found; show server message if available
-                  alert(msg || "Profile update failed. See console for details.");
+                  alert((res && res.message) || "Profile update failed. See console.");
                 }
-              })
-              .catch((err) => {
-                console.error("PROFILE UPDATE ERROR (PUT):", err);
-                // try fallback POST as last resort
-                fetch(API_BASE + "/updatecustomer", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(payload),
-                })
-                  .then((r2) => r2.json().catch(() => null))
-                  .then((r2data) => {
-                    console.log("PROFILE UPDATE RESPONSE (POST fallback after fetch error):", r2data);
-                    if (r2data && r2data.success) {
-                      alert(r2data.message || "Profile updated successfully (fallback).");
-                      $("#Password").val("");
-                      return;
-                    }
-                    alert((r2data && r2data.message) || "Profile update failed. See console for details.");
-                  })
-                  .catch((err2) => {
-                    console.error("Fallback update error after fetch error:", err2);
-                    alert("Profile update failed. See console.");
-                  });
-              });
+              },
+              error: function (xhr, status, err) {
+                // show details in console and show user friendly message
+                console.error("PROFILE UPDATE ERROR (POST):", status, err, xhr && xhr.responseText);
+                let serverMsg = "";
+                try {
+                  serverMsg = xhr && xhr.responseText ? JSON.parse(xhr.responseText) : null;
+                } catch (e) {
+                  serverMsg = xhr && xhr.responseText ? xhr.responseText : null;
+                }
+                console.log("Parsed serverMsg:", serverMsg);
+                alert("Profile update failed. Check console (network) for details.");
+              },
+            });
           });
 
-        // 4) Back from profile button
+        // 4) Back button
         $("#btnBackFromProfile")
           .off("click")
           .on("click", function () {
