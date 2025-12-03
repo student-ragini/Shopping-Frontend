@@ -21,9 +21,7 @@ $(function () {
   function fixImageUrl(raw) {
     if (!raw) return "";
     try {
-      // full URL?
       if (/^https?:\/\//i.test(raw)) {
-        // if localhost, convert to /public/<file>
         if (/^(https?:\/\/)(127\.0\.0\.1|localhost)/i.test(raw)) {
           const fname = raw.split("/").pop();
           return fname ? "/public/" + fname : "";
@@ -31,12 +29,10 @@ $(function () {
         return raw;
       }
 
-      // "public/..." pattern
       if (/^public[\\/]/i.test(raw)) {
         return "/" + raw.replace(/^[\\/]+/, "");
       }
 
-      // just filename
       const fname = raw.split(/[\\/]/).pop();
       return fname ? "/public/" + fname : "";
     } catch (e) {
@@ -293,8 +289,8 @@ $(function () {
         .catch(function () {});
     });
 
- /* =========================
-   * Profile page - load & update (use POST /updatecustomer fallback)
+  /* =========================
+   * Profile page - load & update (robust)
    * ======================= */
 
   function loadProfilePage() {
@@ -305,30 +301,30 @@ $(function () {
       return;
     }
 
-    // Will store best id returned by backend (prefer _id)
-    let loadedCustomerId = null;
-
-    // 1) Load profile.html into container
+    // 1) load profile.html into bodyContainer
     $.ajax({ method: "GET", url: "/profile.html" })
       .then(function (html) {
         $("#bodyContainer").html(html);
 
-        // 2) Fetch customer data from backend
-        fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
-          .then((r) => {
-            console.log("PROFILE LOAD HTTP STATUS:", r.status);
-            return r.json().catch(() => null);
+        // 2) fetch profile from backend
+        fetch(API_BASE + "/customers/" + encodeURIComponent(uid), {
+          method: "GET",
+          headers: { "Accept": "application/json" },
+        })
+          .then(async (r) => {
+            if (!r.ok) {
+              const txt = await r.text().catch(() => "");
+              console.error("PROFILE LOAD HTTP ERROR:", r.status, txt);
+              alert("Unable to load profile. See console for details.");
+              return;
+            }
+            return r.json();
           })
           .then((resp) => {
             console.log("PROFILE LOAD →", resp);
-
             if (resp && resp.success && resp.customer) {
               const c = resp.customer;
 
-              // prefer Mongo _id if present, otherwise other ids
-              loadedCustomerId = c._id || c.id || c.UserId || c.userId || uid;
-
-              // fill form supporting varied key casing
               $("#UserId").val(c.UserId || c.userId || "");
               $("#FirstName").val(c.FirstName || c.firstName || "");
               $("#LastName").val(c.LastName || c.lastName || "");
@@ -340,9 +336,9 @@ $(function () {
               $("#Country").val(c.Country || c.country || "");
               $("#Mobile").val(c.Mobile || c.mobile || "");
 
-              const dobVal = c.DateOfBirth || c.dateOfBirth || null;
-              if (dobVal) {
-                const dt = new Date(dobVal);
+              if (c.DateOfBirth || c.dateOfBirth) {
+                const dobStr = c.DateOfBirth || c.dateOfBirth;
+                const dt = new Date(dobStr);
                 if (!isNaN(dt.getTime())) {
                   const mm = String(dt.getMonth() + 1).padStart(2, "0");
                   const dd = String(dt.getDate()).padStart(2, "0");
@@ -350,99 +346,135 @@ $(function () {
                 }
               }
             } else {
-              console.warn("Profile load returned no customer or success=false", resp);
+              // sometimes API returns raw customer object (without success flag)
+              if (resp && resp._id) {
+                const c = resp;
+                $("#UserId").val(c.UserId || c.userId || "");
+                $("#FirstName").val(c.FirstName || c.firstName || "");
+                $("#LastName").val(c.LastName || c.lastName || "");
+                $("#Email").val(c.Email || c.email || "");
+                $("#Gender").val(c.Gender || c.gender || "");
+                $("#Address").val(c.Address || c.address || "");
+                $("#PostalCode").val(c.PostalCode || c.postalCode || "");
+                $("#State").val(c.State || c.state || "");
+                $("#Country").val(c.Country || c.country || "");
+                $("#Mobile").val(c.Mobile || c.mobile || "");
+                if (c.DateOfBirth || c.dateOfBirth) {
+                  const dobStr = c.DateOfBirth || c.dateOfBirth;
+                  const dt = new Date(dobStr);
+                  if (!isNaN(dt.getTime())) {
+                    const mm = String(dt.getMonth() + 1).padStart(2, "0");
+                    const dd = String(dt.getDate()).padStart(2, "0");
+                    $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
+                  }
+                }
+              } else {
+                console.warn("PROFILE LOAD: unexpected response", resp);
+              }
             }
           })
           .catch((err) => {
             console.error("PROFILE LOAD ERROR:", err);
+            alert("Error loading profile. See console for details.");
           });
 
-        // 3) Update handler — use POST /updatecustomer (form-encoded) which matches many backends
+        // 3) update button - try PUT first, fallback to POST /updatecustomer
         $("#btnUpdateProfile")
           .off("click")
-          .on("click", function (e) {
+          .on("click", async function (e) {
             e.preventDefault();
 
-            // collect values
-            const uidField = ($("#UserId").val() || "").trim();
-            const first = ($("#FirstName").val() || "").trim();
-            const last = ($("#LastName").val() || "").trim();
-            const email = ($("#Email").val() || "").trim();
-            const gender = $("#Gender").val() || "";
-            const addr = ($("#Address").val() || "").trim();
-            const pin = ($("#PostalCode").val() || "").trim();
-            const state = ($("#State").val() || "").trim();
-            const country = ($("#Country").val() || "").trim();
-            const mobile = ($("#Mobile").val() || "").trim();
-            const dob = $("#DateOfBirth").val() || null;
-            const pwd = ($("#Password").val() || "").trim();
-
-            // prepare payload object (use keys backend may expect)
-            const payload = {
-              // include identifier fields
-              _id: loadedCustomerId || undefined,
-              id: loadedCustomerId && String(loadedCustomerId),
-              UserId: uidField || undefined,
-              userId: uidField || undefined,
-
-              // profile fields (both cases to increase compatibility)
-              FirstName: first || undefined,
-              firstName: first || undefined,
-              LastName: last || undefined,
-              lastName: last || undefined,
-              Email: email || undefined,
-              email: email || undefined,
-              Gender: gender || undefined,
-              gender: gender || undefined,
-              Address: addr || undefined,
-              address: addr || undefined,
-              PostalCode: pin || undefined,
-              postalCode: pin || undefined,
-              State: state || undefined,
-              state: state || undefined,
-              Country: country || undefined,
-              country: country || undefined,
-              Mobile: mobile || undefined,
-              mobile: mobile || undefined,
-              DateOfBirth: dob || undefined,
-              dateOfBirth: dob || undefined,
-            };
-
-            if (pwd !== "") {
-              payload.Password = pwd;
-              payload.password = pwd;
+            const uidInner = getCurrentUserId();
+            if (!uidInner) {
+              alert("Please login first.");
+              $("#btnNavLogin").click();
+              return;
             }
 
-            console.log("PROFILE UPDATE: payload →", payload);
+            const payload = {
+              UserId: $("#UserId").val(),
+              FirstName: $("#FirstName").val(),
+              LastName: $("#LastName").val(),
+              Email: $("#Email").val(),
+              Gender: $("#Gender").val(),
+              Address: $("#Address").val(),
+              PostalCode: $("#PostalCode").val(),
+              State: $("#State").val(),
+              Country: $("#Country").val(),
+              Mobile: $("#Mobile").val(),
+              DateOfBirth: $("#DateOfBirth").val() || null,
+            };
 
-            // Use jQuery $.ajax POST (default contentType = application/x-www-form-urlencoded)
-            // This matches older/backends that expect form-data instead of JSON body.
-            $.ajax({
-              method: "POST",
-              url: API_BASE + "/updatecustomer",
-              data: payload,
-              success: function (res) {
-                console.log("PROFILE UPDATE RESPONSE (POST):", res);
-                if (res && res.success) {
-                  alert(res.message || "Profile updated successfully.");
+            if ($("#Password").val().trim() !== "") {
+              payload.Password = $("#Password").val().trim();
+            }
+
+            // Try PUT /customers/:id (preferred). If fails, fallback to POST /updatecustomer
+            try {
+              const putResp = await fetch(
+                API_BASE + "/customers/" + encodeURIComponent(uidInner),
+                {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Accept: "application/json",
+                  },
+                  body: JSON.stringify(payload),
+                }
+              );
+
+              if (putResp.ok) {
+                const putJson = await putResp.json().catch(() => null);
+                console.log("PROFILE UPDATE (PUT) RESPONSE →", putJson);
+                if (putJson && putJson.success !== false) {
+                  alert(putJson.message || "Profile updated successfully.");
                   $("#Password").val("");
+                  return;
                 } else {
-                  alert((res && res.message) || "Profile update failed. See console.");
+                  // server responded but said failure -> show message then try fallback
+                  console.warn("PUT returned success:false", putJson);
+                  // continue to fallback
                 }
-              },
-              error: function (xhr, status, err) {
-                // show details in console and show user friendly message
-                console.error("PROFILE UPDATE ERROR (POST):", status, err, xhr && xhr.responseText);
-                let serverMsg = "";
-                try {
-                  serverMsg = xhr && xhr.responseText ? JSON.parse(xhr.responseText) : null;
-                } catch (e) {
-                  serverMsg = xhr && xhr.responseText ? xhr.responseText : null;
-                }
-                console.log("Parsed serverMsg:", serverMsg);
-                alert("Profile update failed. Check console (network) for details.");
-              },
-            });
+              } else {
+                // Non-OK status from PUT -> log and fallback
+                const txt = await putResp.text().catch(() => "");
+                console.warn("PUT failed:", putResp.status, txt);
+              }
+            } catch (err) {
+              console.warn("PUT error:", err);
+            }
+
+            // fallback: POST to /updatecustomer (older backend)
+            try {
+              const postResp = await fetch(API_BASE + "/updatecustomer", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                },
+                body: JSON.stringify(payload),
+              });
+
+              if (!postResp.ok) {
+                const txt = await postResp.text().catch(() => "");
+                console.error("PROFILE UPDATE (POST) HTTP ERROR:", postResp.status, txt);
+                alert("Profile update failed (server error). See console.");
+                return;
+              }
+
+              const postJson = await postResp.json().catch(() => null);
+              console.log("PROFILE UPDATE RESPONSE (POST):", postJson);
+
+              if (postJson && postJson.success) {
+                alert(postJson.message || "Profile updated successfully.");
+                $("#Password").val("");
+              } else {
+                alert((postJson && postJson.message) || "Profile update failed. See console.");
+              }
+            } catch (err) {
+              console.error("PROFILE UPDATE ERROR:", err);
+              alert("Profile update failed due to network error. See console.");
+            }
           });
 
         // 4) Back button
@@ -456,11 +488,11 @@ $(function () {
           });
       })
       .catch(function (err) {
-        console.error("Failed to load profile.html:", err);
-        alert("Unable to open profile form. See console.");
+        console.error("Unable to load profile.html:", err);
+        alert("Unable to load profile page.");
       });
   }
-  
+
   /* =========================
    * Nav: Profile
    * ======================= */
@@ -475,12 +507,8 @@ $(function () {
         return;
       }
 
-      $.ajax({ method: "GET", url: "/profile.html" })
-        .then(function (resp) {
-          $("#bodyContainer").html(resp);
-          loadProfilePage();
-        })
-        .catch(function () {});
+      // load and initialize
+      loadProfilePage();
     });
 
   /* =========================
