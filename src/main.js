@@ -293,8 +293,8 @@ $(function () {
         .catch(function () {});
     });
 
-  /* =========================
-   * Profile page - load & update
+ /* =========================
+   * Profile page - load & update (robust)
    * ======================= */
 
   function loadProfilePage() {
@@ -305,136 +305,226 @@ $(function () {
       return;
     }
 
-    // ---- 1) Backend se profile data lao (GET /customers/:id) ----
-    fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
-      .then((r) => r.json())
-      .then((resp) => {
-        console.log("PROFILE LOAD →", resp);
+    // keep loaded customer id (prefer _id from DB)
+    let loadedCustomerId = null;
 
-        if (resp && resp.success && resp.customer) {
-          const c = resp.customer;
+    // 1) Load profile HTML
+    $.ajax({ method: "GET", url: "/profile.html" })
+      .then(function (html) {
+        $("#bodyContainer").html(html);
 
-          $("#UserId").val(c.UserId || c.userId || "");
-          $("#FirstName").val(c.FirstName || c.firstName || "");
-          $("#LastName").val(c.LastName || c.lastName || "");
-          $("#Email").val(c.Email || c.email || "");
-          $("#Gender").val(c.Gender || c.gender || "");
-          $("#Address").val(c.Address || c.address || "");
-          $("#PostalCode").val(c.PostalCode || c.postalCode || "");
-          $("#State").val(c.State || c.state || "");
-          $("#Country").val(c.Country || c.country || "");
-          $("#Mobile").val(c.Mobile || c.mobile || "");
+        // 2) Fetch the customer data from backend
+        fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
+          .then((r) => {
+            // debug: show HTTP status
+            console.log("PROFILE LOAD HTTP STATUS:", r.status);
+            return r.json().catch((e) => {
+              console.error("Failed to parse profile JSON", e);
+              return null;
+            });
+          })
+          .then((resp) => {
+            console.log("PROFILE LOAD →", resp);
 
-          // DOB → yyyy-mm-dd
-          if (c.DateOfBirth || c.dateOfBirth) {
-            const dobStr = c.DateOfBirth || c.dateOfBirth;
-            const dt = new Date(dobStr);
-            if (!isNaN(dt.getTime())) {
-              const mm = String(dt.getMonth() + 1).padStart(2, "0");
-              const dd = String(dt.getDate()).padStart(2, "0");
-              $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
-            }
-          }
-        }
-      })
-      .catch((err) => console.error("PROFILE LOAD ERROR:", err));
+            if (resp && resp.success && resp.customer) {
+              const c = resp.customer;
 
-    // ---- 2) Update button (PUT /customers/:id) ----
-    $("#btnUpdateProfile")
-      .off("click")
-      .on("click", function (e) {
-        e.preventDefault();
+              // store best id for updates: prefer Mongo _id, then id, then userId/UserId, fallback to cookie uid
+              loadedCustomerId =
+                c._id || c.id || c.UserId || c.userId || uid || null;
 
-        const uidInput = ($("#UserId").val() || "").trim() || uid;
-        const first = ($("#FirstName").val() || "").trim();
-        const last = ($("#LastName").val() || "").trim();
-        const email = ($("#Email").val() || "").trim();
-        const gender = $("#Gender").val() || "";
-        const addr = ($("#Address").val() || "").trim();
-        const pin = ($("#PostalCode").val() || "").trim();
-        const state = ($("#State").val() || "").trim();
-        const country = ($("#Country").val() || "").trim();
-        const mobile = ($("#Mobile").val() || "").trim();
-        const dob = $("#DateOfBirth").val() || null;
-        const pwd = ($("#Password").val() || "").trim();
+              // fill form fields (support mixed casing from backend)
+              $("#UserId").val(c.UserId || c.userId || "");
+              $("#FirstName").val(c.FirstName || c.firstName || "");
+              $("#LastName").val(c.LastName || c.lastName || "");
+              $("#Email").val(c.Email || c.email || "");
+              $("#Gender").val(c.Gender || c.gender || "");
+              $("#Address").val(c.Address || c.address || "");
+              $("#PostalCode").val(c.PostalCode || c.postalCode || "");
+              $("#State").val(c.State || c.state || "");
+              $("#Country").val(c.Country || c.country || "");
+              $("#Mobile").val(c.Mobile || c.mobile || "");
 
-        // Payload: include both naming styles so backend accepts
-        const payload = {
-          UserId: uidInput,
-          userId: uidInput,
-
-          FirstName: first,
-          firstName: first,
-
-          LastName: last,
-          lastName: last,
-
-          Email: email,
-          email: email,
-
-          Gender: gender,
-          gender: gender,
-
-          Address: addr,
-          address: addr,
-
-          PostalCode: pin,
-          postalCode: pin,
-
-          State: state,
-          state: state,
-
-          Country: country,
-          country: country,
-
-          Mobile: mobile,
-          mobile: mobile,
-
-          DateOfBirth: dob,
-          dateOfBirth: dob,
-        };
-
-        if (pwd !== "") {
-          payload.Password = pwd;
-          payload.password = pwd;
-        }
-
-        // IMPORTANT: use PUT to /customers/:id
-        fetch(API_BASE + "/customers/" + encodeURIComponent(uidInput), {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-          .then((r) => r.json())
-          .then((up) => {
-            console.log("PROFILE UPDATE RESPONSE →", up);
-
-            if (up && up.success) {
-              alert(up.message || "Profile updated successfully.");
-              $("#Password").val(""); // clear password
+              // DOB → yyyy-mm-dd
+              const dobVal = c.DateOfBirth || c.dateOfBirth || null;
+              if (dobVal) {
+                const dt = new Date(dobVal);
+                if (!isNaN(dt.getTime())) {
+                  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+                  const dd = String(dt.getDate()).padStart(2, "0");
+                  $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
+                }
+              }
             } else {
-              alert(
-                (up && up.message) || "Profile update failed. Please try again."
-              );
+              // If backend returned something but success false, show message
+              console.warn("Profile load returned no customer or success=false", resp);
+              // we still allow user to try update — but better to alert
+              // alert("Unable to load profile data.");
             }
           })
           .catch((err) => {
-            console.error("PROFILE UPDATE ERROR:", err);
-            alert("Profile update failed. Please try again.");
+            console.error("PROFILE LOAD ERROR:", err);
+            // optional: alert user
+            // alert("Failed to load profile. Check console for details.");
           });
-      });
 
-    // ---- 3) Back button ----
-    $("#btnBackFromProfile")
-      .off("click")
-      .on("click", function () {
-        $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
-          $("#bodyContainer").html(p);
-          getProducts();
-        });
+        // 3) Attach Update button handler
+        $("#btnUpdateProfile")
+          .off("click")
+          .on("click", function (e) {
+            e.preventDefault();
+
+            // collect fields (trim where appropriate)
+            const uidField = ($("#UserId").val() || "").trim();
+            const first = ($("#FirstName").val() || "").trim();
+            const last = ($("#LastName").val() || "").trim();
+            const email = ($("#Email").val() || "").trim();
+            const gender = $("#Gender").val() || "";
+            const addr = ($("#Address").val() || "").trim();
+            const pin = ($("#PostalCode").val() || "").trim();
+            const state = ($("#State").val() || "").trim();
+            const country = ($("#Country").val() || "").trim();
+            const mobile = ($("#Mobile").val() || "").trim();
+            const dob = $("#DateOfBirth").val() || null;
+            const pwd = ($("#Password").val() || "").trim();
+
+            // choose id to use for update:
+            // prefer loadedCustomerId (DB _id), otherwise use UserId field if it's present,
+            // finally fallback to cookie uid (getCurrentUserId()).
+            const idToUse =
+              loadedCustomerId || uidField || getCurrentUserId() || uid;
+
+            // Build payload with both naming styles (backend may expect different keys)
+            const payload = {
+              // ids
+              UserId: uidField || undefined,
+              userId: uidField || undefined,
+
+              // name fields
+              FirstName: first || undefined,
+              firstName: first || undefined,
+              LastName: last || undefined,
+              lastName: last || undefined,
+
+              // other
+              Email: email || undefined,
+              email: email || undefined,
+              Gender: gender || undefined,
+              gender: gender || undefined,
+              Address: addr || undefined,
+              address: addr || undefined,
+              PostalCode: pin || undefined,
+              postalCode: pin || undefined,
+              State: state || undefined,
+              state: state || undefined,
+              Country: country || undefined,
+              country: country || undefined,
+              Mobile: mobile || undefined,
+              mobile: mobile || undefined,
+              DateOfBirth: dob || undefined,
+              dateOfBirth: dob || undefined,
+            };
+
+            if (pwd !== "") {
+              payload.Password = pwd;
+              payload.password = pwd;
+            }
+
+            console.log("Attempting profile update. idToUse:", idToUse, "payload:", payload);
+
+            // Primary attempt: use PUT /customers/:idToUse
+            fetch(API_BASE + "/customers/" + encodeURIComponent(idToUse), {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            })
+              .then(async (r) => {
+                const status = r.status;
+                const data = await r.json().catch(() => null);
+                console.log("PROFILE UPDATE RESPONSE (PUT) status:", status, "body:", data);
+
+                if (r.ok && data && data.success) {
+                  alert(data.message || "Profile updated successfully.");
+                  $("#Password").val("");
+                  return;
+                }
+
+                // If PUT failed with 404 or server says user not found,
+                // try legacy endpoint POST /updatecustomer (fallback).
+                const msg =
+                  (data && data.message) ||
+                  "Profile update attempt returned status " + status;
+
+                if (status === 404 || (data && /not found/i.test(String(msg)))) {
+                  console.warn("PUT returned 404 or not found; attempting fallback POST /updatecustomer");
+
+                  // fallback POST (older backend route)
+                  return fetch(API_BASE + "/updatecustomer", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  })
+                    .then((r2) => r2.json().catch(() => null))
+                    .then((r2data) => {
+                      console.log("PROFILE UPDATE RESPONSE (POST fallback):", r2data);
+                      if (r2data && r2data.success) {
+                        alert(r2data.message || "Profile updated successfully (fallback).");
+                        $("#Password").val("");
+                        return;
+                      }
+                      // final failure
+                      alert((r2data && r2data.message) || "Profile update failed. See console for details.");
+                    })
+                    .catch((err2) => {
+                      console.error("Fallback update error:", err2);
+                      alert("Profile update failed (fallback). See console.");
+                    });
+                } else {
+                  // PUT failed but not a not-found; show server message if available
+                  alert(msg || "Profile update failed. See console for details.");
+                }
+              })
+              .catch((err) => {
+                console.error("PROFILE UPDATE ERROR (PUT):", err);
+                // try fallback POST as last resort
+                fetch(API_BASE + "/updatecustomer", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload),
+                })
+                  .then((r2) => r2.json().catch(() => null))
+                  .then((r2data) => {
+                    console.log("PROFILE UPDATE RESPONSE (POST fallback after fetch error):", r2data);
+                    if (r2data && r2data.success) {
+                      alert(r2data.message || "Profile updated successfully (fallback).");
+                      $("#Password").val("");
+                      return;
+                    }
+                    alert((r2data && r2data.message) || "Profile update failed. See console for details.");
+                  })
+                  .catch((err2) => {
+                    console.error("Fallback update error after fetch error:", err2);
+                    alert("Profile update failed. See console.");
+                  });
+              });
+          });
+
+        // 4) Back from profile button
+        $("#btnBackFromProfile")
+          .off("click")
+          .on("click", function () {
+            $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
+              $("#bodyContainer").html(p);
+              getProducts();
+            });
+          });
+      })
+      .catch(function (err) {
+        console.error("Failed to load profile.html:", err);
+        alert("Unable to open profile form. See console.");
       });
   }
-
+  
   /* =========================
    * Nav: Profile
    * ======================= */
