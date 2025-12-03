@@ -15,7 +15,11 @@ $(function () {
    * ======================= */
 
   function getCurrentUserId() {
-    return $.cookie("userid") || null;
+    try {
+      return $.cookie("userid") || null;
+    } catch (e) {
+      return null;
+    }
   }
 
   function fixImageUrl(raw) {
@@ -113,6 +117,7 @@ $(function () {
     }
   }
 
+  // ensure cart is sane on load
   sanitizeCart().then(function () {
     updateCartCount();
   });
@@ -345,7 +350,26 @@ $(function () {
       .on("click", function (e) {
         e.preventDefault();
 
-        const uidInput = ($("#UserId").val() || "").trim() || uid;
+        // ------------------------------
+        // Safer userId selection logic:
+        //  - prefer cookie value (login authenticated id)
+        //  - allow manual input only if it exactly matches cookie value
+        // ------------------------------
+        const inputUser = ($("#UserId").val() || "").trim();
+        const cookieUser = getCurrentUserId() || "";
+
+        // prefer cookieUser (this avoids accidental spaces / differences)
+        const uidInput = (inputUser && inputUser === cookieUser) ? inputUser : cookieUser;
+
+        // temporary debug log (remove after verification)
+        console.log("PROFILE UPDATE -> uidInput:", uidInput, "inputUser:", inputUser, "cookieUser:", cookieUser);
+
+        if (!uidInput) {
+          alert("Unable to determine your user id. Please login again.");
+          $("#btnNavLogin").click();
+          return;
+        }
+
         const first = ($("#FirstName").val() || "").trim();
         const last = ($("#LastName").val() || "").trim();
         const email = ($("#Email").val() || "").trim();
@@ -405,7 +429,21 @@ $(function () {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         })
-          .then((r) => r.json())
+          .then((r) => {
+            // check for non-json 404/other responses gracefully
+            if (!r.ok) {
+              // try parse json body to show message
+              return r.text().then((text) => {
+                try {
+                  const parsed = JSON.parse(text);
+                  return parsed;
+                } catch (e) {
+                  return { success: false, message: text || "Server error" };
+                }
+              });
+            }
+            return r.json();
+          })
           .then((up) => {
             console.log("PROFILE UPDATE RESPONSE →", up);
 
@@ -413,9 +451,7 @@ $(function () {
               alert(up.message || "Profile updated successfully.");
               $("#Password").val(""); // clear password
             } else {
-              alert(
-                (up && up.message) || "Profile update failed. Please try again."
-              );
+              alert((up && up.message) || "Profile update failed. Please try again.");
             }
           })
           .catch((err) => {
