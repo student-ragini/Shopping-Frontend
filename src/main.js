@@ -9,7 +9,6 @@ const API_BASE =
 $(function () {
   // Last loaded products (for search + sort)
   let currentProducts = [];
-  
 
   /* =========================
    * Helpers
@@ -24,7 +23,7 @@ $(function () {
     try {
       // full URL?
       if (/^https?:\/\//i.test(raw)) {
-        // localhost ko ignore karke public se lo
+        // if localhost, convert to /public/<file>
         if (/^(https?:\/\/)(127\.0\.0\.1|localhost)/i.test(raw)) {
           const fname = raw.split("/").pop();
           return fname ? "/public/" + fname : "";
@@ -37,7 +36,7 @@ $(function () {
         return "/" + raw.replace(/^[\\/]+/, "");
       }
 
-      // sirf file name
+      // just filename
       const fname = raw.split(/[\\/]/).pop();
       return fname ? "/public/" + fname : "";
     } catch (e) {
@@ -294,127 +293,147 @@ $(function () {
         .catch(function () {});
     });
 
- /* =========================
- * Profile page - load & update
- * ======================= */
+  /* =========================
+   * Profile page - load & update
+   * ======================= */
 
-// page ke top pe (currentProducts ke paas) ek global var bhi add karna hai:
-// let currentProfileMongoId = null;
+  function loadProfilePage() {
+    const uid = getCurrentUserId();
+    if (!uid) {
+      alert("Please login first.");
+      $("#btnNavLogin").click();
+      return;
+    }
 
-function loadProfilePage() {
-  const uid = getCurrentUserId();
-  if (!uid) {
-    alert("Please login first.");
-    $("#btnNavLogin").click();
-    return;
-  }
+    // ---- 1) Backend se profile data lao (GET /customers/:id) ----
+    fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
+      .then((r) => r.json())
+      .then((resp) => {
+        console.log("PROFILE LOAD →", resp);
 
-  // ---- 1) Backend se profile data lao (GET /customers/:UserId) ----
-  fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
-    .then((r) => r.json())
-    .then((resp) => {
-      console.log("PROFILE LOAD →", resp);
+        if (resp && resp.success && resp.customer) {
+          const c = resp.customer;
 
-      if (resp && resp.success && resp.customer) {
-        const c = resp.customer;
+          $("#UserId").val(c.UserId || c.userId || "");
+          $("#FirstName").val(c.FirstName || c.firstName || "");
+          $("#LastName").val(c.LastName || c.lastName || "");
+          $("#Email").val(c.Email || c.email || "");
+          $("#Gender").val(c.Gender || c.gender || "");
+          $("#Address").val(c.Address || c.address || "");
+          $("#PostalCode").val(c.PostalCode || c.postalCode || "");
+          $("#State").val(c.State || c.state || "");
+          $("#Country").val(c.Country || c.country || "");
+          $("#Mobile").val(c.Mobile || c.mobile || "");
 
-        // Mongo _id ko global me save karo (update ke liye)
-        currentProfileMongoId = c._id || null;
-
-        $("#UserId").val(c.UserId || c.userId || "");
-        $("#FirstName").val(c.FirstName || c.firstName || "");
-        $("#LastName").val(c.LastName || c.lastName || "");
-        $("#Email").val(c.Email || c.email || "");
-        $("#Gender").val(c.Gender || c.gender || "");
-        $("#Address").val(c.Address || c.address || "");
-        $("#PostalCode").val(c.PostalCode || c.postalCode || "");
-        $("#State").val(c.State || c.state || "");
-        $("#Country").val(c.Country || c.country || "");
-        $("#Mobile").val(c.Mobile || c.mobile || "");
-
-        // DOB → yyyy-mm-dd
-        if (c.DateOfBirth || c.dateOfBirth) {
-          const dobStr = c.DateOfBirth || c.dateOfBirth;
-          const dt = new Date(dobStr);
-          if (!isNaN(dt.getTime())) {
-            const mm = String(dt.getMonth() + 1).padStart(2, "0");
-            const dd = String(dt.getDate()).padStart(2, "0");
-            $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
+          // DOB → yyyy-mm-dd
+          if (c.DateOfBirth || c.dateOfBirth) {
+            const dobStr = c.DateOfBirth || c.dateOfBirth;
+            const dt = new Date(dobStr);
+            if (!isNaN(dt.getTime())) {
+              const mm = String(dt.getMonth() + 1).padStart(2, "0");
+              const dd = String(dt.getDate()).padStart(2, "0");
+              $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
+            }
           }
         }
-      }
-    })
-    .catch((err) => console.error("PROFILE LOAD ERROR:", err));
-
-  // ---- 2) Update button (PUT /customers/:_id) ----
-  $("#btnUpdateProfile")
-    .off("click")
-    .on("click", function (e) {
-      e.preventDefault();
-
-      if (!currentProfileMongoId) {
-        alert("Cannot update profile: internal id missing.");
-        return;
-      }
-
-      const pwd = $("#Password").val().trim();
-
-      const payload = {
-        UserId: $("#UserId").val(),
-        FirstName: $("#FirstName").val(),
-        LastName: $("#LastName").val(),
-        DateOfBirth: $("#DateOfBirth").val() || null,
-        Email: $("#Email").val(),
-        Gender: $("#Gender").val(),
-        Address: $("#Address").val(),
-        PostalCode: $("#PostalCode").val(),
-        State: $("#State").val(),
-        Country: $("#Country").val(),
-        Mobile: $("#Mobile").val(),
-      };
-
-      if (pwd !== "") {
-        payload.Password = pwd;
-      }
-
-      $.ajax({
-        method: "PUT",
-        url:
-          API_BASE +
-          "/customers/" +
-          encodeURIComponent(currentProfileMongoId), // yaha _id ja raha hai
-        data: JSON.stringify(payload),
-        contentType: "application/json",
-        dataType: "json",
       })
-        .then(function (up) {
-          console.log("PROFILE UPDATE RESPONSE →", up);
-          if (up && up.success) {
-            alert(up.message || "Profile updated successfully.");
-            $("#Password").val(""); // clear password
-          } else {
-            alert(
-              (up && up.message) ||
-                "Profile update failed. Please try again."
-            );
-          }
-        })
-        .catch(function (err) {
-          console.error("PROFILE UPDATE ERROR:", err);
-          alert("Profile update failed. Please try again.");
-        });
-    });
+      .catch((err) => console.error("PROFILE LOAD ERROR:", err));
 
-  // ---- 3) Back button ----
-  $("#btnBackFromProfile")
-    .off("click")
-    .on("click", function () {
-      $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
-        $("#bodyContainer").html(p);
-        getProducts();
+    // ---- 2) Update button (PUT /customers/:id) ----
+    $("#btnUpdateProfile")
+      .off("click")
+      .on("click", function (e) {
+        e.preventDefault();
+
+        const uidInput = ($("#UserId").val() || "").trim() || uid;
+        const first = ($("#FirstName").val() || "").trim();
+        const last = ($("#LastName").val() || "").trim();
+        const email = ($("#Email").val() || "").trim();
+        const gender = $("#Gender").val() || "";
+        const addr = ($("#Address").val() || "").trim();
+        const pin = ($("#PostalCode").val() || "").trim();
+        const state = ($("#State").val() || "").trim();
+        const country = ($("#Country").val() || "").trim();
+        const mobile = ($("#Mobile").val() || "").trim();
+        const dob = $("#DateOfBirth").val() || null;
+        const pwd = ($("#Password").val() || "").trim();
+
+        // Payload: include both naming styles so backend accepts
+        const payload = {
+          UserId: uidInput,
+          userId: uidInput,
+
+          FirstName: first,
+          firstName: first,
+
+          LastName: last,
+          lastName: last,
+
+          Email: email,
+          email: email,
+
+          Gender: gender,
+          gender: gender,
+
+          Address: addr,
+          address: addr,
+
+          PostalCode: pin,
+          postalCode: pin,
+
+          State: state,
+          state: state,
+
+          Country: country,
+          country: country,
+
+          Mobile: mobile,
+          mobile: mobile,
+
+          DateOfBirth: dob,
+          dateOfBirth: dob,
+        };
+
+        if (pwd !== "") {
+          payload.Password = pwd;
+          payload.password = pwd;
+        }
+
+        // IMPORTANT: use PUT to /customers/:id
+        fetch(API_BASE + "/customers/" + encodeURIComponent(uidInput), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then((r) => r.json())
+          .then((up) => {
+            console.log("PROFILE UPDATE RESPONSE →", up);
+
+            if (up && up.success) {
+              alert(up.message || "Profile updated successfully.");
+              $("#Password").val(""); // clear password
+            } else {
+              alert(
+                (up && up.message) || "Profile update failed. Please try again."
+              );
+            }
+          })
+          .catch((err) => {
+            console.error("PROFILE UPDATE ERROR:", err);
+            alert("Profile update failed. Please try again.");
+          });
       });
-    });
-}
+
+    // ---- 3) Back button ----
+    $("#btnBackFromProfile")
+      .off("click")
+      .on("click", function () {
+        $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
+          $("#bodyContainer").html(p);
+          getProducts();
+        });
+      });
+  }
 
   /* =========================
    * Nav: Profile
@@ -430,11 +449,9 @@ function loadProfilePage() {
         return;
       }
 
-      // Pehle profile.html load karo
       $.ajax({ method: "GET", url: "/profile.html" })
-        .then(function (html) {
-          $("#bodyContainer").html(html);
-          // Ab form DOM me aa gaya → data fill + buttons attach
+        .then(function (resp) {
+          $("#bodyContainer").html(resp);
           loadProfilePage();
         })
         .catch(function () {});
