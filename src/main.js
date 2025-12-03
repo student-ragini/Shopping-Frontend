@@ -186,6 +186,7 @@ $(function () {
    * Login helper
    * ======================= */
 
+  // ---------- Better login handler: save any id returned by backend ----------
   function attachLoginHandler(onSuccess) {
     $("#btnLogin")
       .off("click")
@@ -212,9 +213,22 @@ $(function () {
               return;
             }
 
-            const uid = resp.userId || formUserId;
+            // backend might return id in many shapes. pick best available.
+            let uid =
+              resp.userId ||
+              (resp.user && (resp.user.UserId || resp.user.userId || resp.user._id)) ||
+              resp._id ||
+              formUserId;
 
-            $.cookie("userid", uid, { path: "/" });
+            // fallback: if resp has user object with email/mobile, we might use those later
+            try {
+              $.cookie("userid", uid, { path: "/" });
+            } catch (e) {
+              console.warn("Failed to set cookie userid:", e);
+            }
+
+            console.log("Login success, saving userid cookie =", uid);
+
             $("#user").text(uid);
             $("#btnSignout").text("Signout");
 
@@ -237,7 +251,8 @@ $(function () {
               });
             }
           })
-          .catch(function () {
+          .catch(function (err) {
+            console.error("Login error:", err);
             alert("Login error");
           });
       });
@@ -305,134 +320,204 @@ $(function () {
       return;
     }
 
-    // ---- 1) Backend se profile data lao (GET /customers/:id) ----
-    fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
-      .then((r) => r.json())
-      .then((resp) => {
-        console.log("PROFILE LOAD →", resp);
+    // primary attempt: GET /customers/:id
+    function populateAndWire(c) {
+      // populate UI from customer object c
+      $("#UserId").val(c.UserId || c.userId || "");
+      $("#FirstName").val(c.FirstName || c.firstName || "");
+      $("#LastName").val(c.LastName || c.lastName || "");
+      $("#Email").val(c.Email || c.email || "");
+      $("#Gender").val(c.Gender || c.gender || "");
+      $("#Address").val(c.Address || c.address || "");
+      $("#PostalCode").val(c.PostalCode || c.postalCode || "");
+      $("#State").val(c.State || c.state || "");
+      $("#Country").val(c.Country || c.country || "");
+      $("#Mobile").val(c.Mobile || c.mobile || "");
 
-        if (resp && resp.success && resp.customer) {
-          const c = resp.customer;
+      // DOB → yyyy-mm-dd
+      const dobStr = c.DateOfBirth || c.dateOfBirth || c.dob || null;
+      if (dobStr) {
+        const dt = new Date(dobStr);
+        if (!isNaN(dt.getTime())) {
+          const mm = String(dt.getMonth() + 1).padStart(2, "0");
+          const dd = String(dt.getDate()).padStart(2, "0");
+          $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
+        }
+      }
+    }
 
-          $("#UserId").val(c.UserId || c.userId || "");
-          $("#FirstName").val(c.FirstName || c.firstName || "");
-          $("#LastName").val(c.LastName || c.lastName || "");
-          $("#Email").val(c.Email || c.email || "");
-          $("#Gender").val(c.Gender || c.gender || "");
-          $("#Address").val(c.Address || c.address || "");
-          $("#PostalCode").val(c.PostalCode || c.postalCode || "");
-          $("#State").val(c.State || c.state || "");
-          $("#Country").val(c.Country || c.country || "");
-          $("#Mobile").val(c.Mobile || c.mobile || "");
-
-          // DOB → yyyy-mm-dd
-          if (c.DateOfBirth || c.dateOfBirth) {
-            const dobStr = c.DateOfBirth || c.dateOfBirth;
-            const dt = new Date(dobStr);
-            if (!isNaN(dt.getTime())) {
-              const mm = String(dt.getMonth() + 1).padStart(2, "0");
-              const dd = String(dt.getDate()).padStart(2, "0");
-              $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
-            }
+    function tryPrimaryFetch(idToUse) {
+      console.log("PROFILE LOAD → trying id:", idToUse);
+      fetch(API_BASE + "/customers/" + encodeURIComponent(idToUse))
+        .then((r) => {
+          if (!r.ok) {
+            // pass on the status object for debugging
+            return r.json().then((j) => {
+              throw { status: r.status, body: j };
+            }).catch(() => {
+              throw { status: r.status, body: null };
+            });
           }
-        }
-      })
-      .catch((err) => console.error("PROFILE LOAD ERROR:", err));
-
-    // ---- 2) Update button (PUT /customers/:id) ----
-    $("#btnUpdateProfile")
-      .off("click")
-      .on("click", function (e) {
-        e.preventDefault();
-
-        const uidInput = ($("#UserId").val() || "").trim() || uid;
-        const first = ($("#FirstName").val() || "").trim();
-        const last = ($("#LastName").val() || "").trim();
-        const email = ($("#Email").val() || "").trim();
-        const gender = $("#Gender").val() || "";
-        const addr = ($("#Address").val() || "").trim();
-        const pin = ($("#PostalCode").val() || "").trim();
-        const state = ($("#State").val() || "").trim();
-        const country = ($("#Country").val() || "").trim();
-        const mobile = ($("#Mobile").val() || "").trim();
-        const dob = $("#DateOfBirth").val() || null;
-        const pwd = ($("#Password").val() || "").trim();
-
-        // Payload: include both naming styles so backend accepts
-        const payload = {
-          UserId: uidInput,
-          userId: uidInput,
-
-          FirstName: first,
-          firstName: first,
-
-          LastName: last,
-          lastName: last,
-
-          Email: email,
-          email: email,
-
-          Gender: gender,
-          gender: gender,
-
-          Address: addr,
-          address: addr,
-
-          PostalCode: pin,
-          postalCode: pin,
-
-          State: state,
-          state: state,
-
-          Country: country,
-          country: country,
-
-          Mobile: mobile,
-          mobile: mobile,
-
-          DateOfBirth: dob,
-          dateOfBirth: dob,
-        };
-
-        if (pwd !== "") {
-          payload.Password = pwd;
-          payload.password = pwd;
-        }
-
-        // IMPORTANT: use PUT to /customers/:id
-        fetch(API_BASE + "/customers/" + encodeURIComponent(uidInput), {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          return r.json();
         })
-          .then((r) => r.json())
-          .then((up) => {
-            console.log("PROFILE UPDATE RESPONSE →", up);
+        .then((resp) => {
+          console.log("PROFILE LOAD → response", resp);
+          if (resp && resp.success && resp.customer) {
+            populateAndWire(resp.customer);
+          } else if (resp && resp.customer) {
+            populateAndWire(resp.customer);
+          } else {
+            // treat as not found -> fallback
+            throw { status: 404, body: resp };
+          }
+        })
+        .catch((err) => {
+          console.warn("PROFILE LOAD primary failed:", err);
+          // fallback: try listing customers and find match by fields (debug helper)
+          fetch(API_BASE + "/customers")
+            .then((r) => r.json())
+            .then((all) => {
+              if (!Array.isArray(all)) {
+                throw new Error("customers list not returned");
+              }
 
-            if (up && up.success) {
-              alert(up.message || "Profile updated successfully.");
-              $("#Password").val(""); // clear password
-            } else {
-              alert(
-                (up && up.message) || "Profile update failed. Please try again."
-              );
-            }
-          })
-          .catch((err) => {
-            console.error("PROFILE UPDATE ERROR:", err);
-            alert("Profile update failed. Please try again.");
-          });
-      });
+              // try to find by UserId, email or mobile
+              const found =
+                all.find((c) => {
+                  const u = (c.UserId || c.userId || "").toString();
+                  const e = (c.Email || c.email || "").toString();
+                  const m = (c.Mobile || c.mobile || "").toString();
+                  if (!u && !e && !m) return false;
+                  return (
+                    u === uid ||
+                    e === uid ||
+                    m === uid ||
+                    (uid && u && u.toLowerCase() === uid.toLowerCase())
+                  );
+                }) || null;
 
-    // ---- 3) Back button ----
-    $("#btnBackFromProfile")
-      .off("click")
-      .on("click", function () {
-        $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
-          $("#bodyContainer").html(p);
-          getProducts();
+              if (found) {
+                console.log("PROFILE LOAD fallback found:", found);
+                // choose an id the backend expects - prefer UserId -> _id
+                const newId = found.UserId || found.userId || found._id || found.email || uid;
+                try { $.cookie("userid", newId, { path: "/" }); } catch (e) {}
+                console.log("PROFILE LOAD: updating cookie userid ->", newId);
+                populateAndWire(found);
+              } else {
+                alert(
+                  "Unable to load profile. The id stored for you (" +
+                    uid +
+                    ") did not match any customer record. Please contact admin or try logging in again."
+                );
+                console.log("PROFILE LOAD fallback: no match in customers list");
+              }
+            })
+            .catch((e) => {
+              console.error("PROFILE LOAD fallback error:", e);
+              alert("Unable to load profile. See console for details.");
+            });
+        })
+        .finally(() => {
+          // wire update button (even if profile fields are empty; they can fill)
+          $("#btnUpdateProfile")
+            .off("click")
+            .on("click", function (e) {
+              e.preventDefault();
+
+              const uidInput = ($("#UserId").val() || "").trim() || uid;
+              const first = ($("#FirstName").val() || "").trim();
+              const last = ($("#LastName").val() || "").trim();
+              const email = ($("#Email").val() || "").trim();
+              const gender = $("#Gender").val() || "";
+              const addr = ($("#Address").val() || "").trim();
+              const pin = ($("#PostalCode").val() || "").trim();
+              const state = ($("#State").val() || "").trim();
+              const country = ($("#Country").val() || "").trim();
+              const mobile = ($("#Mobile").val() || "").trim();
+              const dob = $("#DateOfBirth").val() || null;
+              const pwd = ($("#Password").val() || "").trim();
+
+              const payload = {
+                UserId: uidInput,
+                userId: uidInput,
+                FirstName: first,
+                firstName: first,
+                LastName: last,
+                lastName: last,
+                Email: email,
+                email: email,
+                Gender: gender,
+                gender: gender,
+                Address: addr,
+                address: addr,
+                PostalCode: pin,
+                postalCode: pin,
+                State: state,
+                state: state,
+                Country: country,
+                country: country,
+                Mobile: mobile,
+                mobile: mobile,
+                DateOfBirth: dob,
+                dateOfBirth: dob,
+              };
+
+              if (pwd !== "") {
+                payload.Password = pwd;
+                payload.password = pwd;
+              }
+
+              console.log("PROFILE UPDATE -> PUT /customers/" + encodeURIComponent(uidInput), payload);
+
+              fetch(API_BASE + "/customers/" + encodeURIComponent(uidInput), {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              })
+                .then((r) => {
+                  if (!r.ok) {
+                    return r.json().then((j) => {
+                      throw { status: r.status, body: j };
+                    }).catch(() => {
+                      throw { status: r.status, body: null };
+                    });
+                  }
+                  return r.json();
+                })
+                .then((up) => {
+                  console.log("PROFILE UPDATE RESPONSE →", up);
+
+                  if (up && up.success) {
+                    alert(up.message || "Profile updated successfully.");
+                    $("#Password").val(""); // clear password
+                  } else {
+                    alert((up && up.message) || "Profile update failed. Please try again.");
+                  }
+                })
+                .catch((err) => {
+                  console.error("PROFILE UPDATE ERROR:", err);
+                  if (err && err.status === 404) {
+                    alert("Profile update failed: user not found (404). Check that your userid matches backend keys.");
+                  } else {
+                    alert("Profile update failed. Please try again.");
+                  }
+                });
+            });
+
+          // Back button
+          $("#btnBackFromProfile")
+            .off("click")
+            .on("click", function () {
+              $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
+                $("#bodyContainer").html(p);
+                getProducts();
+              });
+            });
         });
-      });
+    }
+
+    // start with cookie uid
+    tryPrimaryFetch(uid);
   }
 
   /* =========================
