@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 /* global $, document */
 
-// 👇 Backend base URL
+// Backend base URL
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
   "https://shopping-backend-jb5p.onrender.com";
@@ -14,18 +14,20 @@ $(function () {
    * Helpers
    * ======================= */
 
-  // Current logged-in user id from cookie
   function getCurrentUserId() {
-    return $.cookie("userid") || null;
+    try {
+      return $.cookie("userid") || null;
+    } catch (e) {
+      return null;
+    }
   }
 
-  // Normalize product image paths
   function fixImageUrl(raw) {
     if (!raw) return "";
     try {
-      // Absolute http(s) URL
+      // full URL?
       if (/^https?:\/\//i.test(raw)) {
-        // If it is pointing to localhost, fall back to public file name
+        // if localhost, convert to /public/<file>
         if (/^(https?:\/\/)(127\.0\.0\.1|localhost)/i.test(raw)) {
           const fname = raw.split("/").pop();
           return fname ? "/public/" + fname : "";
@@ -33,21 +35,19 @@ $(function () {
         return raw;
       }
 
-      // Already something like "public/iphone.jpg"
+      // "public/..." pattern
       if (/^public[\\/]/i.test(raw)) {
         return "/" + raw.replace(/^[\\/]+/, "");
       }
 
-      // "iphone.jpg", "/iphone.jpg", "img/iphone.jpg" → "/public/iphone.jpg"
+      // just filename
       const fname = raw.split(/[\\/]/).pop();
       return fname ? "/public/" + fname : "";
     } catch (e) {
-      console.warn("fixImageUrl error:", e);
       return "";
     }
   }
 
-  // Remove cart items whose products no longer exist
   async function sanitizeCart() {
     try {
       let cart = JSON.parse(localStorage.getItem("cart") || "[]");
@@ -55,10 +55,7 @@ $(function () {
       cart = cart.map((it) => ({ id: String(it.id), qty: Number(it.qty) || 1 }));
 
       const resp = await fetch(API_BASE + "/getproducts");
-      if (!resp.ok) {
-        console.warn("sanitizeCart: /getproducts returned", resp.status);
-        return;
-      }
+      if (!resp.ok) return;
       const products = await resp.json();
 
       const valid = new Set();
@@ -68,17 +65,14 @@ $(function () {
       });
 
       const filtered = cart.filter((it) => valid.has(String(it.id)));
-
       if (filtered.length !== cart.length) {
-        console.info("sanitizeCart: removed invalid cart items");
         localStorage.setItem("cart", JSON.stringify(filtered));
       }
     } catch (err) {
-      console.warn("sanitizeCart error (ignored):", err);
+      // ignore
     }
   }
 
-  // Save cart for session + per-user
   function saveCartToLocalAndUser(cart) {
     try {
       const arr = Array.isArray(cart) ? cart : [];
@@ -88,11 +82,10 @@ $(function () {
         localStorage.setItem("cart_" + uid, JSON.stringify(arr));
       }
     } catch (e) {
-      console.warn("saveCartToLocalAndUser error:", e);
+      // ignore
     }
   }
 
-  // Load cart, preferring per-user cart
   function loadCartForCurrentUser() {
     try {
       const uid = getCurrentUserId();
@@ -102,12 +95,10 @@ $(function () {
       }
       return JSON.parse(localStorage.getItem("cart") || "[]");
     } catch (e) {
-      console.warn("loadCartForCurrentUser error:", e);
       return [];
     }
   }
 
-  // Show cart item count in navbar
   function updateCartCount() {
     try {
       const cart = loadCartForCurrentUser();
@@ -122,12 +113,11 @@ $(function () {
         $("#btnCart").text("Cart(" + total + ")");
       }
     } catch (err) {
-      console.error("updateCartCount error:", err);
       if ($("#cartCount").length) $("#cartCount").text(0);
     }
   }
 
-  // Run cart clean-up once on load
+  // ensure cart is sane on load
   sanitizeCart().then(function () {
     updateCartCount();
   });
@@ -190,8 +180,7 @@ $(function () {
                   $("#bodyContainer").html(resp2);
                 });
               })
-              .catch(function (err) {
-                console.error("Register error:", err);
+              .catch(function () {
                 alert("Registration failed");
               });
           });
@@ -199,7 +188,7 @@ $(function () {
     });
 
   /* =========================
-   * Login helper – uses POST /login
+   * Login helper
    * ======================= */
 
   function attachLoginHandler(onSuccess) {
@@ -238,7 +227,7 @@ $(function () {
               const per = localStorage.getItem("cart_" + uid);
               if (per) localStorage.setItem("cart", per);
             } catch (e) {
-              console.warn("restore cart error:", e);
+              // ignore
             }
 
             updateCartCount();
@@ -253,8 +242,7 @@ $(function () {
               });
             }
           })
-          .catch(function (err) {
-            console.error("Login fetch error:", err);
+          .catch(function () {
             alert("Login error");
           });
       });
@@ -272,9 +260,7 @@ $(function () {
           $("#bodyContainer").html(resp);
           attachLoginHandler();
         })
-        .catch(function (err) {
-          console.error("Load login.html error:", err);
-        });
+        .catch(function () {});
     });
 
   /* =========================
@@ -292,7 +278,7 @@ $(function () {
           localStorage.setItem("cart_" + uid, JSON.stringify(cart));
         }
       } catch (e) {
-        /* ignore */
+        // ignore
       }
 
       $.removeCookie("userid", { path: "/" });
@@ -309,10 +295,181 @@ $(function () {
           $("#bodyContainer").html(resp);
           attachLoginHandler();
         })
-        .catch(function (err) {
-          console.error("Load login.html error:", err);
-        });
+        .catch(function () {});
     });
+
+  /* =========================
+   * Profile page - load & update
+   * ======================= */
+
+  function loadProfilePage() {
+    const uid = getCurrentUserId();
+    if (!uid) {
+      alert("Please login first.");
+      $("#btnNavLogin").click();
+      return;
+    }
+
+    // ---- 1) Backend se profile data lao (GET /customers/:id) ----
+    fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
+      .then((r) => r.json())
+      .then((resp) => {
+        console.log("PROFILE LOAD →", resp);
+
+        if (resp && resp.success && resp.customer) {
+          const c = resp.customer;
+
+          $("#UserId").val(c.UserId || c.userId || "");
+          $("#FirstName").val(c.FirstName || c.firstName || "");
+          $("#LastName").val(c.LastName || c.lastName || "");
+          $("#Email").val(c.Email || c.email || "");
+          $("#Gender").val(c.Gender || c.gender || "");
+          $("#Address").val(c.Address || c.address || "");
+          $("#PostalCode").val(c.PostalCode || c.postalCode || "");
+          $("#State").val(c.State || c.state || "");
+          $("#Country").val(c.Country || c.country || "");
+          $("#Mobile").val(c.Mobile || c.mobile || "");
+
+          // DOB → yyyy-mm-dd
+          if (c.DateOfBirth || c.dateOfBirth) {
+            const dobStr = c.DateOfBirth || c.dateOfBirth;
+            const dt = new Date(dobStr);
+            if (!isNaN(dt.getTime())) {
+              const mm = String(dt.getMonth() + 1).padStart(2, "0");
+              const dd = String(dt.getDate()).padStart(2, "0");
+              $("#DateOfBirth").val(dt.getFullYear() + "-" + mm + "-" + dd);
+            }
+          }
+        }
+      })
+      .catch((err) => console.error("PROFILE LOAD ERROR:", err));
+
+    // ---- 2) Update button (PUT /customers/:id) ----
+    $("#btnUpdateProfile")
+      .off("click")
+      .on("click", function (e) {
+        e.preventDefault();
+
+        // ------------------------------
+        // Safer userId selection logic:
+        //  - prefer cookie value (login authenticated id)
+        //  - allow manual input only if it exactly matches cookie value
+        // ------------------------------
+        const inputUser = ($("#UserId").val() || "").trim();
+        const cookieUser = getCurrentUserId() || "";
+
+        // prefer cookieUser (this avoids accidental spaces / differences)
+        const uidInput = (inputUser && inputUser === cookieUser) ? inputUser : cookieUser;
+
+        // temporary debug log (remove after verification)
+        console.log("PROFILE UPDATE -> uidInput:", uidInput, "inputUser:", inputUser, "cookieUser:", cookieUser);
+
+        if (!uidInput) {
+          alert("Unable to determine your user id. Please login again.");
+          $("#btnNavLogin").click();
+          return;
+        }
+
+        const first = ($("#FirstName").val() || "").trim();
+        const last = ($("#LastName").val() || "").trim();
+        const email = ($("#Email").val() || "").trim();
+        const gender = $("#Gender").val() || "";
+        const addr = ($("#Address").val() || "").trim();
+        const pin = ($("#PostalCode").val() || "").trim();
+        const state = ($("#State").val() || "").trim();
+        const country = ($("#Country").val() || "").trim();
+        const mobile = ($("#Mobile").val() || "").trim();
+        const dob = $("#DateOfBirth").val() || null;
+        const pwd = ($("#Password").val() || "").trim();
+
+        // Payload: include both naming styles so backend accepts
+        const payload = {
+          UserId: uidInput,
+          userId: uidInput,
+
+          FirstName: first,
+          firstName: first,
+
+          LastName: last,
+          lastName: last,
+
+          Email: email,
+          email: email,
+
+          Gender: gender,
+          gender: gender,
+
+          Address: addr,
+          address: addr,
+
+          PostalCode: pin,
+          postalCode: pin,
+
+          State: state,
+          state: state,
+
+          Country: country,
+          country: country,
+
+          Mobile: mobile,
+          mobile: mobile,
+
+          DateOfBirth: dob,
+          dateOfBirth: dob,
+        };
+
+        if (pwd !== "") {
+          payload.Password = pwd;
+          payload.password = pwd;
+        }
+
+        // IMPORTANT: use PUT to /customers/:id
+        fetch(API_BASE + "/customers/" + encodeURIComponent(uidInput), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then((r) => {
+            // check for non-json 404/other responses gracefully
+            if (!r.ok) {
+              // try parse json body to show message
+              return r.text().then((text) => {
+                try {
+                  const parsed = JSON.parse(text);
+                  return parsed;
+                } catch (e) {
+                  return { success: false, message: text || "Server error" };
+                }
+              });
+            }
+            return r.json();
+          })
+          .then((up) => {
+            console.log("PROFILE UPDATE RESPONSE →", up);
+
+            if (up && up.success) {
+              alert(up.message || "Profile updated successfully.");
+              $("#Password").val(""); // clear password
+            } else {
+              alert((up && up.message) || "Profile update failed. Please try again.");
+            }
+          })
+          .catch((err) => {
+            console.error("PROFILE UPDATE ERROR:", err);
+            alert("Profile update failed. Please try again.");
+          });
+      });
+
+    // ---- 3) Back button ----
+    $("#btnBackFromProfile")
+      .off("click")
+      .on("click", function () {
+        $.ajax({ method: "GET", url: "/products.html" }).then(function (p) {
+          $("#bodyContainer").html(p);
+          getProducts();
+        });
+      });
+  }
 
   /* =========================
    * Nav: Profile
@@ -333,9 +490,7 @@ $(function () {
           $("#bodyContainer").html(resp);
           loadProfilePage();
         })
-        .catch(function (err) {
-          console.error("Load profile.html error:", err);
-        });
+        .catch(function () {});
     });
 
   /* =========================
@@ -394,14 +549,7 @@ $(function () {
       }
     });
 
-  // Footer quick-links
-  $("#navCategoriesFooter")
-    .off("click")
-    .on("click", function (e) {
-      e.preventDefault();
-      $("#btnNavCategories").click();
-    });
-
+  // Footer links
   $("#navShopF")
     .off("click")
     .on("click", function (e) {
@@ -417,7 +565,7 @@ $(function () {
     });
 
   /* =========================
-   * My Orders (LIST + DETAILS)
+   * Orders (list + detail)
    * ======================= */
 
   function renderOrderDetails(order) {
@@ -614,8 +762,7 @@ $(function () {
             renderOrderDetails(order);
           });
       })
-      .catch(function (err) {
-        console.error("showOrders error:", err);
+      .catch(function () {
         $("#bodyContainer").html(
           '<div class="p-4 text-danger">Error loading orders.</div>'
         );
@@ -675,8 +822,6 @@ $(function () {
           });
 
         if (missingIds.length) {
-          console.warn("Missing product in cart, removing:", missingIds);
-
           let newCart;
           try {
             newCart = loadCartForCurrentUser();
@@ -785,8 +930,9 @@ $(function () {
             const id = String($(this).data("id"));
             let c = loadCartForCurrentUser();
             c.forEach(function (it) {
-              if (String(it.id) === id)
+              if (String(it.id) === id) {
                 it.qty = Math.max(1, (it.qty || 1) - 1);
+              }
             });
             saveCartToLocalAndUser(c);
             updateCartCount();
@@ -947,6 +1093,7 @@ $(function () {
       });
   }
 
+  // Cart button → show cart
   $("#btnCart")
     .off("click")
     .on("click", function (e) {
@@ -1125,117 +1272,6 @@ $(function () {
   }
 
   /* =========================
-   * Profile page – load & update
-   * ======================= */
-
-  function loadProfilePage() {
-    const uid = getCurrentUserId();
-    if (!uid) {
-      alert("Please login again.");
-      $("#btnNavLogin").click();
-      return;
-    }
-
-    // back button
-    $("#btnBackFromProfile")
-      .off("click")
-      .on("click", function () {
-        $.ajax({ method: "GET", url: "/products.html" }).then(function (resp) {
-          $("#bodyContainer").html(resp);
-          getProducts();
-        });
-      });
-
-    // fetch profile data
-    $.ajax({
-      method: "GET",
-      url: API_BASE + "/customers/" + encodeURIComponent(uid),
-    })
-      .then(function (resp) {
-        if (!resp || resp.success === false || !resp.customer) {
-          alert(
-            (resp && resp.message) ||
-              "Unable to load profile. Please try again later."
-          );
-          return;
-        }
-
-        const c = resp.customer;
-
-        $("#UserId").val(c.UserId || uid).prop("disabled", true);
-        $("#FirstName").val(c.FirstName || "");
-        $("#LastName").val(c.LastName || "");
-        $("#Email").val(c.Email || "");
-        $("#Gender").val(c.Gender || "");
-        $("#Address").val(c.Address || "");
-        $("#PostalCode").val(c.PostalCode || "");
-        $("#State").val(c.State || "");
-        $("#Country").val(c.Country || "");
-        $("#Mobile").val(c.Mobile || "");
-
-        if (c.DateOfBirth) {
-          const d = new Date(c.DateOfBirth);
-          const iso = d.toISOString().slice(0, 10);
-          $("#DateOfBirth").val(iso);
-        } else {
-          $("#DateOfBirth").val("");
-        }
-
-        // update click handler
-        $("#btnUpdateProfile")
-          .off("click")
-          .on("click", function () {
-            const payload = {
-              FirstName: $("#FirstName").val().trim(),
-              LastName: $("#LastName").val().trim(),
-              DateOfBirth: $("#DateOfBirth").val(),
-              Email: $("#Email").val().trim(),
-              Gender: $("#Gender").val(),
-              Address: $("#Address").val().trim(),
-              PostalCode: $("#PostalCode").val().trim(),
-              State: $("#State").val().trim(),
-              Country: $("#Country").val().trim(),
-              Mobile: $("#Mobile").val().trim(),
-            };
-
-            const newPwd = $("#Password").val();
-            if (newPwd && newPwd.trim() !== "") {
-              if (newPwd.trim().length < 6) {
-                alert("New password must be at least 6 characters.");
-                return;
-              }
-              payload.Password = newPwd.trim();
-            }
-
-            $.ajax({
-              method: "PUT",
-              url: API_BASE + "/customers/" + encodeURIComponent(uid),
-              data: payload,
-            })
-              .then(function (r) {
-                if (!r || r.success === false) {
-                  alert((r && r.message) || "Update failed");
-                  return;
-                }
-
-                alert(r.message || "Profile updated successfully");
-
-                // password field clear
-                $("#Password").val("");
-              })
-              .catch(function (err) {
-                console.error("Profile update error:", err);
-                alert("Profile update failed. Please try again.");
-              });
-          });
-      })
-      .catch(function (err) {
-        console.error("Load profile data error:", err);
-        alert("Unable to load profile right now.");
-      });
-  }
-
-  /* =========================
    * Product detail page
    * ======================= */
 
@@ -1365,10 +1401,18 @@ $(function () {
       if (perCart) {
         localStorage.setItem("cart", perCart);
       }
+      $("#user").text(uid);
+      $("#btnSignout").text("Signout");
     }
   } catch (e) {
-    /* ignore */
+    // ignore
   }
 
   updateCartCount();
+
+  // Footer year
+  const yearSpan = document.getElementById("year");
+  if (yearSpan) {
+    yearSpan.textContent = new Date().getFullYear();
+  }
 });
