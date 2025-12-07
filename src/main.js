@@ -1,71 +1,46 @@
-/* src/main.js */
 /* eslint-disable no-unused-vars */
 /* global $, document */
 
+// Backend base URL
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
   "https://shopping-backend-jb5p.onrender.com";
 
 $(function () {
+  // Last loaded products (for search + sort)
   let currentProducts = [];
 
-  // store last-loaded customer info from GET /customers/:id
-  let loadedCustomerId = null; // Mongo _id
-  let loadedCustomerUserId = null; // customer.UserId
+  /* =========================
+   * Helpers
+   * ======================= */
 
-  /* Helpers */
   function getCurrentUserId() {
     try {
-      // prefer cookie, fallback to localStorage
-      const c = typeof $.cookie === "function" ? $.cookie("userid") : null;
-      if (c) return c;
-      const ls = localStorage.getItem("userid");
-      return ls || null;
+      return $.cookie("userid") || null;
     } catch (e) {
-      try {
-        return localStorage.getItem("userid") || null;
-      } catch (ee) {
-        return null;
-      }
-    }
-  }
-
-  function setCurrentUserId(uid) {
-    try {
-      if (uid) {
-        if (typeof $.cookie === "function") {
-          $.cookie("userid", uid, { path: "/" });
-        }
-        localStorage.setItem("userid", uid);
-      } else {
-        if (typeof $.removeCookie === "function") {
-          $.removeCookie("userid", { path: "/" });
-        }
-        localStorage.removeItem("userid");
-      }
-    } catch (e) {
-      try {
-        if (uid) localStorage.setItem("userid", uid);
-        else localStorage.removeItem("userid");
-      } catch (ee) {
-        // ignore
-      }
+      return null;
     }
   }
 
   function fixImageUrl(raw) {
     if (!raw) return "";
     try {
+      // full URL?
       if (/^https?:\/\//i.test(raw)) {
+        // if localhost, convert to /public/<file>
         if (/^(https?:\/\/)(127\.0\.0\.1|localhost)/i.test(raw)) {
           const fname = raw.split("/").pop();
           return fname ? "/public/" + fname : "";
         }
         return raw;
       }
+
+      // "public/..." pattern
       if (/^public[\\/]/i.test(raw)) {
         return "/" + raw.replace(/^[\\/]+/, "");
       }
+
+      // just filename
       const fname = raw.split(/[\\/]/).pop();
       return fname ? "/public/" + fname : "";
     } catch (e) {
@@ -142,11 +117,15 @@ $(function () {
     }
   }
 
+  // ensure cart is sane on load
   sanitizeCart().then(function () {
     updateCartCount();
   });
 
-  /* REGISTER */
+  /* =========================
+   * Register
+   * ======================= */
+
   $("#btnNavRegister")
     .off("click")
     .on("click", function () {
@@ -208,7 +187,10 @@ $(function () {
       });
     });
 
-  /* LOGIN helper */
+  /* =========================
+   * Login helper
+   * ======================= */
+
   function attachLoginHandler(onSuccess) {
     $("#btnLogin")
       .off("click")
@@ -235,9 +217,9 @@ $(function () {
               return;
             }
 
-            // prefer server-returned userId if present
-            const uid = resp.userId || resp.UserId || formUserId;
-            setCurrentUserId(uid);
+            const uid = resp.userId || formUserId;
+
+            $.cookie("userid", uid, { path: "/" });
             $("#user").text(uid);
             $("#btnSignout").text("Signout");
 
@@ -266,6 +248,10 @@ $(function () {
       });
   }
 
+  /* =========================
+   * Nav: Login
+   * ======================= */
+
   $("#btnNavLogin")
     .off("click")
     .on("click", function () {
@@ -277,7 +263,10 @@ $(function () {
         .catch(function () {});
     });
 
-  /* SIGNOUT */
+  /* =========================
+   * Signout
+   * ======================= */
+
   $("#btnSignout")
     .off("click")
     .on("click", function () {
@@ -292,7 +281,7 @@ $(function () {
         // ignore
       }
 
-      setCurrentUserId(null);
+      $.removeCookie("userid", { path: "/" });
       localStorage.removeItem("cart");
 
       updateCartCount();
@@ -309,7 +298,10 @@ $(function () {
         .catch(function () {});
     });
 
-  /* PROFILE load + update */
+  /* =========================
+   * Profile page - load & update
+   * ======================= */
+
   function loadProfilePage() {
     const uid = getCurrentUserId();
     if (!uid) {
@@ -318,19 +310,14 @@ $(function () {
       return;
     }
 
-    // GET profile
+    // ---- 1) Backend se profile data lao (GET /customers/:id) ----
     fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
       .then((r) => r.json())
       .then((resp) => {
         console.log("PROFILE LOAD →", resp);
-        loadedCustomerId = null;
-        loadedCustomerUserId = null;
 
         if (resp && resp.success && resp.customer) {
           const c = resp.customer;
-
-          loadedCustomerId = c._id || c.id || null;
-          loadedCustomerUserId = c.UserId || c.userId || null;
 
           $("#UserId").val(c.UserId || c.userId || "");
           $("#FirstName").val(c.FirstName || c.firstName || "");
@@ -357,19 +344,25 @@ $(function () {
       })
       .catch((err) => console.error("PROFILE LOAD ERROR:", err));
 
-    // Update
+    // ---- 2) Update button (PUT /customers/:id) ----
     $("#btnUpdateProfile")
       .off("click")
       .on("click", function (e) {
         e.preventDefault();
 
+        // ------------------------------
+        // Safer userId selection logic:
+        //  - prefer cookie value (login authenticated id)
+        //  - allow manual input only if it exactly matches cookie value
+        // ------------------------------
         const inputUser = ($("#UserId").val() || "").trim();
         const cookieUser = getCurrentUserId() || "";
 
-        // prefer cookieUser unless manual input exactly matches cookie
+        // prefer cookieUser (this avoids accidental spaces / differences)
         const uidInput = (inputUser && inputUser === cookieUser) ? inputUser : cookieUser;
 
-        console.log("PROFILE UPDATE -> uidInput:", uidInput, "inputUser:", inputUser, "cookieUser:", cookieUser, "loadedCustomerId:", loadedCustomerId, "loadedCustomerUserId:", loadedCustomerUserId);
+        // temporary debug log (remove after verification)
+        console.log("PROFILE UPDATE -> uidInput:", uidInput, "inputUser:", inputUser, "cookieUser:", cookieUser);
 
         if (!uidInput) {
           alert("Unable to determine your user id. Please login again.");
@@ -389,27 +382,38 @@ $(function () {
         const dob = $("#DateOfBirth").val() || null;
         const pwd = ($("#Password").val() || "").trim();
 
+        // Payload: include both naming styles so backend accepts
         const payload = {
           UserId: uidInput,
           userId: uidInput,
+
           FirstName: first,
           firstName: first,
+
           LastName: last,
           lastName: last,
+
           Email: email,
           email: email,
+
           Gender: gender,
           gender: gender,
+
           Address: addr,
           address: addr,
+
           PostalCode: pin,
           postalCode: pin,
+
           State: state,
           state: state,
+
           Country: country,
           country: country,
+
           Mobile: mobile,
           mobile: mobile,
+
           DateOfBirth: dob,
           dateOfBirth: dob,
         };
@@ -419,95 +423,44 @@ $(function () {
           payload.password = pwd;
         }
 
-        // helper to build clean URL
-        function buildUrl(idPart) {
-          const base = String(API_BASE).replace(/\/+$/, "");
-          return base + "/customers/" + encodeURIComponent(String(idPart));
-        }
-
-        // Try PUT using uidInput first; if 404 / user not found, try using loadedCustomerId (mongo _id) if available
-        const tryPut = async (idToUse) => {
-          const u = buildUrl(idToUse);
-          console.log("PROFILE UPDATE -> calling PUT:", u, payload);
-          try {
-            const resp = await fetch(u, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
-
-            const text = await resp.text().catch(() => "");
-            let parsed;
-            try {
-              parsed = text ? JSON.parse(text) : null;
-            } catch (e) {
-              parsed = text || null;
+        // IMPORTANT: use PUT to /customers/:id
+        fetch(API_BASE + "/customers/" + encodeURIComponent(uidInput), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+          .then((r) => {
+            // check for non-json 404/other responses gracefully
+            if (!r.ok) {
+              // try parse json body to show message
+              return r.text().then((text) => {
+                try {
+                  const parsed = JSON.parse(text);
+                  return parsed;
+                } catch (e) {
+                  return { success: false, message: text || "Server error" };
+                }
+              });
             }
+            return r.json();
+          })
+          .then((up) => {
+            console.log("PROFILE UPDATE RESPONSE →", up);
 
-            console.log("PROFILE UPDATE -> status:", resp.status, "body:", parsed);
-
-            if (!resp.ok) {
-              return { ok: false, status: resp.status, body: parsed };
-            }
-            return { ok: true, status: resp.status, body: parsed };
-          } catch (err) {
-            console.error("PROFILE UPDATE error (fetch):", err);
-            return { ok: false, error: err };
-          }
-        };
-
-        (async function runUpdate() {
-          // 1) first attempt: uidInput
-          const attempt1 = await tryPut(uidInput);
-
-          if (attempt1.ok) {
-            const up = attempt1.body || {};
             if (up && up.success) {
               alert(up.message || "Profile updated successfully.");
-              $("#Password").val("");
+              $("#Password").val(""); // clear password
             } else {
-              alert((up && up.message) || "Profile update response received.");
+              alert((up && up.message) || "Profile update failed. Please try again.");
             }
-            return;
-          }
-
-          // if not ok and status 404 and we have loadedCustomerId, try with that
-          if (
-            (!attempt1.ok && (attempt1.status === 404 || (attempt1.body && attempt1.body.message && String(attempt1.body.message).toLowerCase().includes("not found")))) &&
-            loadedCustomerId
-          ) {
-            console.warn("PROFILE UPDATE -> first attempt failed; trying with loaded _id:", loadedCustomerId);
-            const attempt2 = await tryPut(loadedCustomerId);
-            if (attempt2.ok) {
-              const up = attempt2.body || {};
-              if (up && up.success) {
-                alert(up.message || "Profile updated successfully (via _id).");
-                $("#Password").val("");
-              } else {
-                alert((up && up.message) || "Profile update response received (via _id).");
-              }
-              return;
-            } else {
-              // still failed
-              console.error("PROFILE UPDATE -> second attempt failed:", attempt2);
-              alert(
-                "Profile update failed (server response): " +
-                  (attempt2.body && attempt2.body.message ? attempt2.body.message : "status " + attempt2.status)
-              );
-              return;
-            }
-          }
-
-          // otherwise show attempt1 failure reason
-          console.error("PROFILE UPDATE -> attempt1 failed:", attempt1);
-          alert(
-            "Profile update failed: " +
-              (attempt1.body && attempt1.body.message ? attempt1.body.message : "status " + attempt1.status)
-          );
-        })();
+          })
+          .catch((err) => {
+            console.error("PROFILE UPDATE ERROR:", err);
+            alert("Profile update failed. Please try again.");
+          });
       });
 
-    // Back button
+    // ---- 3) Back button ----
     $("#btnBackFromProfile")
       .off("click")
       .on("click", function () {
@@ -518,7 +471,10 @@ $(function () {
       });
   }
 
-  /* NAV: Profile */
+  /* =========================
+   * Nav: Profile
+   * ======================= */
+
   $("#btnNavProfile")
     .off("click")
     .on("click", function () {
@@ -537,12 +493,80 @@ $(function () {
         .catch(function () {});
     });
 
-  /* The remaining code (products, cart, orders...) kept same as before */
-  // For brevity I will reuse your existing implementations below (unchanged)
-  // ... (getProducts, getCategories, showCart, showOrders, etc.)
-  // If you want full file with ALL functions untruncated, I can paste them — but these profile fixes are the critical part.
+  /* =========================
+   * Nav: Shop
+   * ======================= */
 
-  /* === (I'll paste the rest of the unchanged code from your prior main.js) === */
+  $("#btnNavShopping")
+    .off("click")
+    .on("click", function () {
+      if (!getCurrentUserId()) {
+        $.ajax({ method: "GET", url: "/login.html" }).then(function (resp) {
+          $("#bodyContainer").html(resp);
+          attachLoginHandler(function () {
+            $.ajax({ method: "GET", url: "/products.html" }).then(function (
+              resp2
+            ) {
+              $("#bodyContainer").html(resp2);
+              getProducts();
+            });
+          });
+        });
+      } else {
+        $.ajax({ method: "GET", url: "/products.html" }).then(function (resp) {
+          $("#bodyContainer").html(resp);
+          getProducts();
+        });
+      }
+    });
+
+  /* =========================
+   * Nav: Categories
+   * ======================= */
+
+  $("#btnNavCategories")
+    .off("click")
+    .on("click", function () {
+      if (!getCurrentUserId()) {
+        $.ajax({ method: "GET", url: "/login.html" }).then(function (resp) {
+          $("#bodyContainer").html(resp);
+          attachLoginHandler(function () {
+            $.ajax({ method: "GET", url: "/categories.html" }).then(function (
+              resp2
+            ) {
+              $("#bodyContainer").html(resp2);
+              getCategories();
+            });
+          });
+        });
+      } else {
+        $.ajax({ method: "GET", url: "/categories.html" }).then(function (
+          resp
+        ) {
+          $("#bodyContainer").html(resp);
+          getCategories();
+        });
+      }
+    });
+
+  // Footer links
+  $("#navShopF")
+    .off("click")
+    .on("click", function (e) {
+      e.preventDefault();
+      $("#btnNavShopping").click();
+    });
+
+  $("#navRegisterF")
+    .off("click")
+    .on("click", function (e) {
+      e.preventDefault();
+      $("#btnNavRegister").click();
+    });
+
+  /* =========================
+   * Orders (list + detail)
+   * ======================= */
 
   function renderOrderDetails(order) {
     if (!order) {
@@ -752,7 +776,10 @@ $(function () {
       showOrders();
     });
 
-  /* Cart (same as earlier) */
+  /* =========================
+   * Cart display + checkout
+   * ======================= */
+
   function showCart(attempt) {
     attempt = attempt || 0;
 
@@ -1066,6 +1093,7 @@ $(function () {
       });
   }
 
+  // Cart button → show cart
   $("#btnCart")
     .off("click")
     .on("click", function (e) {
@@ -1073,7 +1101,10 @@ $(function () {
       showCart();
     });
 
-  /* Products + categories (same) */
+  /* =========================
+   * Products + Categories (search + sort)
+   * ======================= */
+
   function renderProducts(list) {
     $("#productCatalog").empty();
 
@@ -1240,7 +1271,10 @@ $(function () {
       });
   }
 
-  /* Product detail */
+  /* =========================
+   * Product detail page
+   * ======================= */
+
   function showProductDetails(productId) {
     $.ajax({ method: "GET", url: API_BASE + "/getproducts" })
       .then(function (products) {
@@ -1356,7 +1390,10 @@ $(function () {
       });
   }
 
-  /* initial sync */
+  /* =========================
+   * Initial sync on page load
+   * ======================= */
+
   try {
     const uid = getCurrentUserId();
     if (uid) {
@@ -1373,6 +1410,7 @@ $(function () {
 
   updateCartCount();
 
+  // Footer year
   const yearSpan = document.getElementById("year");
   if (yearSpan) {
     yearSpan.textContent = new Date().getFullYear();
