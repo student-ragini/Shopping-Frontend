@@ -9,8 +9,8 @@ const API_BASE =
 $(function () {
   // Last loaded products (for search + sort)
   let currentProducts = [];
-  // Last loaded orders (status filter ke liye)
-  let lastOrders = [];
+  // My Orders ke liye global list
+  let allOrders = [];
 
   /* =========================
    * Helpers
@@ -27,9 +27,7 @@ $(function () {
   function fixImageUrl(raw) {
     if (!raw) return "";
     try {
-      // full URL?
       if (/^https?:\/\//i.test(raw)) {
-        // if localhost, convert to /public/<file>
         if (/^(https?:\/\/)(127\.0\.0\.1|localhost)/i.test(raw)) {
           const fname = raw.split("/").pop();
           return fname ? "/public/" + fname : "";
@@ -37,37 +35,15 @@ $(function () {
         return raw;
       }
 
-      // "public/..." pattern
       if (/^public[\\/]/i.test(raw)) {
         return "/" + raw.replace(/^[\\/]+/, "");
       }
 
-      // just filename
       const fname = raw.split(/[\\/]/).pop();
       return fname ? "/public/" + fname : "";
     } catch (e) {
       return "";
     }
-  }
-
-  // order status ko pretty badge banaane ke liye helper
-  function renderStatusBadge(status) {
-    const raw = (status || "Processing").toString();
-    const s = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
-
-    let cls = "bg-secondary";
-    if (s === "Processing") cls = "bg-warning text-dark";
-    else if (s === "Shipped") cls = "bg-info text-dark";
-    else if (s === "Delivered") cls = "bg-success";
-    else if (s === "Cancelled") cls = "bg-danger";
-
-    return (
-      '<span class="badge ' +
-      cls +
-      ' text-capitalize px-3 py-2">' +
-      s +
-      "</span>"
-    );
   }
 
   async function sanitizeCart() {
@@ -139,7 +115,6 @@ $(function () {
     }
   }
 
-  // ensure cart is sane on load
   sanitizeCart().then(function () {
     updateCartCount();
   });
@@ -332,7 +307,6 @@ $(function () {
       return;
     }
 
-    // ---- 1) Backend se profile data lao (GET /customers/:id) ----
     fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
       .then((r) => r.json())
       .then((resp) => {
@@ -352,7 +326,6 @@ $(function () {
           $("#Country").val(c.Country || c.country || "");
           $("#Mobile").val(c.Mobile || c.mobile || "");
 
-          // DOB → yyyy-mm-dd
           if (c.DateOfBirth || c.dateOfBirth) {
             const dobStr = c.DateOfBirth || c.dateOfBirth;
             const dt = new Date(dobStr);
@@ -366,7 +339,6 @@ $(function () {
       })
       .catch((err) => console.error("PROFILE LOAD ERROR:", err));
 
-    // ---- 2) Update button (PUT /customers/:id) ----
     $("#btnUpdateProfile")
       .off("click")
       .on("click", function (e) {
@@ -374,7 +346,6 @@ $(function () {
 
         const inputUser = ($("#UserId").val() || "").trim();
         const cookieUser = getCurrentUserId() || "";
-
         const uidInput =
           inputUser && inputUser === cookieUser ? inputUser : cookieUser;
 
@@ -407,7 +378,6 @@ $(function () {
 
         const payload = {
           UserId: uidInput,
-
           FirstName: first,
           LastName: last,
           Email: email,
@@ -447,7 +417,7 @@ $(function () {
 
             if (up && up.success) {
               alert(up.message || "Profile updated successfully.");
-              $("#Password").val(""); // clear password
+              $("#Password").val("");
             } else {
               alert(
                 (up && up.message) ||
@@ -461,7 +431,6 @@ $(function () {
           });
       });
 
-    // ---- 3) Back button ----
     $("#btnBackFromProfile")
       .off("click")
       .on("click", function () {
@@ -565,8 +534,8 @@ $(function () {
       $("#btnNavRegister").click();
     });
 
- /* =========================
-   * Orders (list + detail + status filter)
+  /* =========================
+   * Orders (list + detail + status change)
    * ======================= */
 
   function renderOrderDetails(order) {
@@ -685,41 +654,77 @@ $(function () {
           return;
         }
 
-        const orders = resp.orders || [];
-        if (!orders.length) {
+        let allOrders = resp.orders || [];
+        if (!allOrders.length) {
           $("#bodyContainer").html(
             '<div class="p-4"><h4>No orders found</h4><p>You have not placed any orders yet.</p></div>'
           );
           return;
         }
 
-        // helper – status badge class
+        const ordersById = {};
+        allOrders.forEach(function (o) {
+          if (o._id) ordersById[String(o._id)] = o;
+        });
+
+        let html =
+          '<div class="container my-4">' +
+          '<div class="d-flex justify-content-between align-items-center">' +
+          '<h3 class="mb-0">My Orders</h3>' +
+          '<div class="d-flex align-items-center">' +
+          '<label class="me-2 mb-0 small">Filter by status:</label>' +
+          '<select id="orderStatusFilter" class="form-select form-select-sm" style="width:auto">' +
+          '<option value="All">All</option>' +
+          '<option value="Created">Created</option>' +
+          '<option value="Processing">Processing</option>' +
+          '<option value="Shipped">Shipped</option>' +
+          '<option value="Delivered">Delivered</option>' +
+          '<option value="Cancelled">Cancelled</option>' +
+          "</select>" +
+          "</div>" +
+          "</div>" +
+          '<div class="table-responsive mt-3">' +
+          '<table class="table table-striped table-bordered align-middle">' +
+          "<thead>" +
+          "<tr>" +
+          "<th>#</th>" +
+          "<th>Order ID</th>" +
+          "<th>Date</th>" +
+          "<th>Items</th>" +
+          "<th>Total (₹)</th>" +
+          "<th>Status</th>" +
+          "<th>Actions</th>" +
+          "</tr>" +
+          "</thead><tbody id='ordersTableBody'></tbody></table></div></div>";
+
+        $("#bodyContainer").html(html);
+
         function getStatusBadgeClass(status) {
-          const s = String(status || "").toLowerCase();
-          if (s === "created" || s === "pending" || s === "processing") {
-            return "bg-warning text-dark";
+          switch (status) {
+            case "Processing":
+              return "bg-warning text-dark";
+            case "Shipped":
+              return "bg-info text-dark";
+            case "Delivered":
+              return "bg-success";
+            case "Cancelled":
+              return "bg-danger";
+            default:
+              return "bg-secondary";
           }
-          if (s === "shipped") return "bg-info text-dark";
-          if (s === "delivered") return "bg-success";
-          if (s === "cancelled" || s === "canceled") return "bg-danger";
-          return "bg-secondary";
         }
 
-        // helper – rows html based on filter
-        function buildRows(filterStatus) {
-          const f = String(filterStatus || "All").toLowerCase();
+        function renderOrdersList(list) {
+          const $tbody = $("#ordersTableBody");
+          if (!list || !list.length) {
+            $tbody.html(
+              '<tr><td colspan="7" class="text-center">No orders found</td></tr>'
+            );
+            return;
+          }
 
-          let rows = "";
-          let counter = 1;
-
-          orders.forEach(function (order) {
-            const statusText = order.status || "Created";
-            const sLower = statusText.toLowerCase();
-
-            if (f !== "all" && sLower !== f) {
-              return; // skip
-            }
-
+          let rowsHtml = "";
+          list.forEach(function (order, idx) {
             const created = order.createdAt
               ? new Date(order.createdAt).toLocaleString()
               : "-";
@@ -731,12 +736,13 @@ $(function () {
                   .join(", ")
               : "-";
 
-            const badgeClass = getStatusBadgeClass(statusText);
+            const status = order.status || "Created";
+            const badgeClass = getStatusBadgeClass(status);
 
-            rows +=
+            rowsHtml +=
               "<tr>" +
               "<td>" +
-              counter +
+              (idx + 1) +
               "</td>" +
               "<td>" +
               (order._id || "") +
@@ -753,78 +759,132 @@ $(function () {
               "<td>" +
               '<span class="badge ' +
               badgeClass +
-              ' text-capitalize">' +
-              statusText +
+              ' me-2">' +
+              status +
               "</span>" +
+              '<select class="form-select form-select-sm d-inline-block order-status-select" ' +
+              'style="width:auto" data-id="' +
+              (order._id || "") +
+              '">' +
+              '<option value="Created"' +
+              (status === "Created" ? " selected" : "") +
+              ">Created</option>" +
+              '<option value="Processing"' +
+              (status === "Processing" ? " selected" : "") +
+              ">Processing</option>" +
+              '<option value="Shipped"' +
+              (status === "Shipped" ? " selected" : "") +
+              ">Shipped</option>" +
+              '<option value="Delivered"' +
+              (status === "Delivered" ? " selected" : "") +
+              ">Delivered</option>" +
+              '<option value="Cancelled"' +
+              (status === "Cancelled" ? " selected" : "") +
+              ">Cancelled</option>" +
+              "</select>" +
               "</td>" +
               "<td>" +
-              '<button class="btn btn-sm btn-outline-primary btn-view-order" data-idx="' +
-              (counter - 1) +
+              '<button class="btn btn-sm btn-outline-primary btn-view-order" data-id="' +
+              (order._id || "") +
               '">View</button>' +
               "</td>" +
               "</tr>";
-
-            counter += 1;
           });
 
-          if (!rows) {
-            rows =
-              '<tr><td colspan="7" class="text-center">No orders found for selected status.</td></tr>';
-          }
-
-          return rows;
+          $tbody.html(rowsHtml);
         }
 
-        // full HTML (table + filter)
-        let html =
-          '<div class="container my-4">' +
-          "<h3>My Orders</h3>" +
-          '<div class="d-flex justify-content-end align-items-center mt-3 mb-2">' +
-          '<label class="me-2 small fw-semibold">Filter by status:</label>' +
-          '<select id="ddlOrderStatusFilter" class="form-select form-select-sm" style="max-width: 200px;">' +
-          '<option value="All">All</option>' +
-          '<option value="Created">Created</option>' +
-          '<option value="Processing">Processing</option>' +
-          '<option value="Shipped">Shipped</option>' +
-          '<option value="Delivered">Delivered</option>' +
-          '<option value="Cancelled">Cancelled</option>' +
-          "</select>" +
-          "</div>" +
-          '<div class="table-responsive mt-2">' +
-          '<table class="table table-striped table-bordered align-middle">' +
-          "<thead>" +
-          "<tr>" +
-          "<th>#</th>" +
-          "<th>Order ID</th>" +
-          "<th>Date</th>" +
-          "<th>Items</th>" +
-          "<th>Total (₹)</th>" +
-          "<th>Status</th>" +
-          "<th>Actions</th>" +
-          "</tr>" +
-          "</thead>" +
-          '<tbody id="ordersTableBody">' +
-          buildRows("All") +
-          "</tbody></table></div></div>";
-
-        $("#bodyContainer").html(html);
+        // initial render
+        renderOrdersList(allOrders);
 
         // filter change
-        $("#ddlOrderStatusFilter")
+        $("#orderStatusFilter")
           .off("change")
           .on("change", function () {
-            const val = $(this).val() || "All";
-            $("#ordersTableBody").html(buildRows(val));
+            const val = $(this).val();
+            if (val === "All") {
+              renderOrdersList(allOrders);
+            } else {
+              const filtered = allOrders.filter(function (o) {
+                return (o.status || "Created") === val;
+              });
+              renderOrdersList(filtered);
+            }
           });
 
-        // view button (delegated)
+        // view button
         $("#bodyContainer")
           .off("click", ".btn-view-order")
           .on("click", ".btn-view-order", function (e) {
             e.preventDefault();
-            const rowIndex = Number($(this).closest("tr").index());
-            const order = orders[rowIndex];
+            const id = String($(this).data("id"));
+            const order = ordersById[id];
             renderOrderDetails(order);
+          });
+
+        // status change
+        $("#bodyContainer")
+          .off("change", ".order-status-select")
+          .on("change", ".order-status-select", function () {
+            const orderId = String($(this).data("id"));
+            const newStatus = $(this).val();
+
+            if (!orderId || !newStatus) return;
+
+            if (
+              !window.confirm(
+                "Change status of this order to '" + newStatus + "'?"
+              )
+            ) {
+              // revert select (reload list)
+              renderOrdersList(allOrders);
+              return;
+            }
+
+            fetch(API_BASE + "/orders/" + encodeURIComponent(orderId) + "/status", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: newStatus }),
+            })
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function (data) {
+                if (data && data.success) {
+                  alert("Order status updated.");
+                  // update local copy
+                  if (ordersById[orderId]) {
+                    ordersById[orderId].status = newStatus;
+                  }
+                  allOrders = allOrders.map(function (o) {
+                    if (String(o._id) === orderId) {
+                      o.status = newStatus;
+                    }
+                    return o;
+                  });
+                  // re-apply current filter
+                  const currentFilter = $("#orderStatusFilter").val();
+                  if (currentFilter === "All") {
+                    renderOrdersList(allOrders);
+                  } else {
+                    const filtered = allOrders.filter(function (o) {
+                      return (o.status || "Created") === currentFilter;
+                    });
+                    renderOrdersList(filtered);
+                  }
+                } else {
+                  alert(
+                    (data && data.message) ||
+                      "Failed to update status. Please try again."
+                  );
+                  renderOrdersList(allOrders);
+                }
+              })
+              .catch(function (err) {
+                console.error("Status update error:", err);
+                alert("Status update failed. Please try again.");
+                renderOrdersList(allOrders);
+              });
           });
       })
       .catch(function () {
@@ -834,6 +894,7 @@ $(function () {
       });
   }
 
+  // My Orders nav
   $("#btnNavOrders")
     .off("click")
     .on("click", function (e) {
@@ -979,15 +1040,15 @@ $(function () {
         $(".btn-increase")
           .off("click")
           .on("click", function () {
-            const id = String($(this).data("id"));
-            let c = loadCartForCurrentUser();
-            c.forEach(function (it) {
-              if (String(it.id) === id) it.qty = (it.qty || 1) + 1;
-            });
-            saveCartToLocalAndUser(c);
-            updateCartCount();
-            showCart();
+          const id = String($(this).data("id"));
+          let c = loadCartForCurrentUser();
+          c.forEach(function (it) {
+            if (String(it.id) === id) it.qty = (it.qty || 1) + 1;
           });
+          saveCartToLocalAndUser(c);
+          updateCartCount();
+          showCart();
+        });
 
         $(".btn-decrease")
           .off("click")
@@ -1158,7 +1219,6 @@ $(function () {
       });
   }
 
-  // Cart button → show cart
   $("#btnCart")
     .off("click")
     .on("click", function (e) {
@@ -1475,7 +1535,6 @@ $(function () {
 
   updateCartCount();
 
-  // Footer year
   const yearSpan = document.getElementById("year");
   if (yearSpan) {
     yearSpan.textContent = new Date().getFullYear();
