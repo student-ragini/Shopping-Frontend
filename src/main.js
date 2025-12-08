@@ -9,6 +9,8 @@ const API_BASE =
 $(function () {
   // Last loaded products (for search + sort)
   let currentProducts = [];
+  // Last loaded orders (status filter ke liye)
+  let lastOrders = [];
 
   /* =========================
    * Helpers
@@ -46,6 +48,26 @@ $(function () {
     } catch (e) {
       return "";
     }
+  }
+
+  // order status ko pretty badge banaane ke liye helper
+  function renderStatusBadge(status) {
+    const raw = (status || "Processing").toString();
+    const s = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+
+    let cls = "bg-secondary";
+    if (s === "Processing") cls = "bg-warning text-dark";
+    else if (s === "Shipped") cls = "bg-info text-dark";
+    else if (s === "Delivered") cls = "bg-success";
+    else if (s === "Cancelled") cls = "bg-danger";
+
+    return (
+      '<span class="badge ' +
+      cls +
+      ' text-capitalize px-3 py-2">' +
+      s +
+      "</span>"
+    );
   }
 
   async function sanitizeCart() {
@@ -350,19 +372,20 @@ $(function () {
       .on("click", function (e) {
         e.preventDefault();
 
-        // ------------------------------
-        // Safer userId selection logic:
-        //  - prefer cookie value (login authenticated id)
-        //  - allow manual input only if it exactly matches cookie value
-        // ------------------------------
         const inputUser = ($("#UserId").val() || "").trim();
         const cookieUser = getCurrentUserId() || "";
 
-        // prefer cookieUser (this avoids accidental spaces / differences)
-        const uidInput = (inputUser && inputUser === cookieUser) ? inputUser : cookieUser;
+        const uidInput =
+          inputUser && inputUser === cookieUser ? inputUser : cookieUser;
 
-        // temporary debug log (remove after verification)
-        console.log("PROFILE UPDATE -> uidInput:", uidInput, "inputUser:", inputUser, "cookieUser:", cookieUser);
+        console.log(
+          "PROFILE UPDATE -> uidInput:",
+          uidInput,
+          "inputUser:",
+          inputUser,
+          "cookieUser:",
+          cookieUser
+        );
 
         if (!uidInput) {
           alert("Unable to determine your user id. Please login again.");
@@ -382,57 +405,32 @@ $(function () {
         const dob = $("#DateOfBirth").val() || null;
         const pwd = ($("#Password").val() || "").trim();
 
-        // Payload: include both naming styles so backend accepts
         const payload = {
           UserId: uidInput,
-          userId: uidInput,
 
           FirstName: first,
-          firstName: first,
-
           LastName: last,
-          lastName: last,
-
           Email: email,
-          email: email,
-
           Gender: gender,
-          gender: gender,
-
           Address: addr,
-          address: addr,
-
           PostalCode: pin,
-          postalCode: pin,
-
           State: state,
-          state: state,
-
           Country: country,
-          country: country,
-
           Mobile: mobile,
-          mobile: mobile,
-
           DateOfBirth: dob,
-          dateOfBirth: dob,
         };
 
         if (pwd !== "") {
           payload.Password = pwd;
-          payload.password = pwd;
         }
 
-        // IMPORTANT: use PUT to /customers/:id
         fetch(API_BASE + "/customers/" + encodeURIComponent(uidInput), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         })
           .then((r) => {
-            // check for non-json 404/other responses gracefully
             if (!r.ok) {
-              // try parse json body to show message
               return r.text().then((text) => {
                 try {
                   const parsed = JSON.parse(text);
@@ -451,7 +449,10 @@ $(function () {
               alert(up.message || "Profile updated successfully.");
               $("#Password").val(""); // clear password
             } else {
-              alert((up && up.message) || "Profile update failed. Please try again.");
+              alert(
+                (up && up.message) ||
+                  "Profile update failed. Please try again."
+              );
             }
           })
           .catch((err) => {
@@ -564,8 +565,8 @@ $(function () {
       $("#btnNavRegister").click();
     });
 
-  /* =========================
-   * Orders (list + detail)
+ /* =========================
+   * Orders (list + detail + status filter)
    * ======================= */
 
   function renderOrderDetails(order) {
@@ -621,7 +622,7 @@ $(function () {
       created +
       "</p>" +
       "<p><strong>Status:</strong> " +
-      (order.status || "created") +
+      (order.status || "Created") +
       "</p>" +
       "<p><strong>Total:</strong> ₹" +
       (order.total || 0) +
@@ -692,10 +693,104 @@ $(function () {
           return;
         }
 
+        // helper – status badge class
+        function getStatusBadgeClass(status) {
+          const s = String(status || "").toLowerCase();
+          if (s === "created" || s === "pending" || s === "processing") {
+            return "bg-warning text-dark";
+          }
+          if (s === "shipped") return "bg-info text-dark";
+          if (s === "delivered") return "bg-success";
+          if (s === "cancelled" || s === "canceled") return "bg-danger";
+          return "bg-secondary";
+        }
+
+        // helper – rows html based on filter
+        function buildRows(filterStatus) {
+          const f = String(filterStatus || "All").toLowerCase();
+
+          let rows = "";
+          let counter = 1;
+
+          orders.forEach(function (order) {
+            const statusText = order.status || "Created";
+            const sLower = statusText.toLowerCase();
+
+            if (f !== "all" && sLower !== f) {
+              return; // skip
+            }
+
+            const created = order.createdAt
+              ? new Date(order.createdAt).toLocaleString()
+              : "-";
+            const itemsText = Array.isArray(order.items)
+              ? order.items
+                  .map(function (it) {
+                    return (it.title || "Item") + " × " + (it.qty || 1);
+                  })
+                  .join(", ")
+              : "-";
+
+            const badgeClass = getStatusBadgeClass(statusText);
+
+            rows +=
+              "<tr>" +
+              "<td>" +
+              counter +
+              "</td>" +
+              "<td>" +
+              (order._id || "") +
+              "</td>" +
+              "<td>" +
+              created +
+              "</td>" +
+              "<td>" +
+              itemsText +
+              "</td>" +
+              "<td>" +
+              (order.total || 0) +
+              "</td>" +
+              "<td>" +
+              '<span class="badge ' +
+              badgeClass +
+              ' text-capitalize">' +
+              statusText +
+              "</span>" +
+              "</td>" +
+              "<td>" +
+              '<button class="btn btn-sm btn-outline-primary btn-view-order" data-idx="' +
+              (counter - 1) +
+              '">View</button>' +
+              "</td>" +
+              "</tr>";
+
+            counter += 1;
+          });
+
+          if (!rows) {
+            rows =
+              '<tr><td colspan="7" class="text-center">No orders found for selected status.</td></tr>';
+          }
+
+          return rows;
+        }
+
+        // full HTML (table + filter)
         let html =
           '<div class="container my-4">' +
           "<h3>My Orders</h3>" +
-          '<div class="table-responsive mt-3">' +
+          '<div class="d-flex justify-content-end align-items-center mt-3 mb-2">' +
+          '<label class="me-2 small fw-semibold">Filter by status:</label>' +
+          '<select id="ddlOrderStatusFilter" class="form-select form-select-sm" style="max-width: 200px;">' +
+          '<option value="All">All</option>' +
+          '<option value="Created">Created</option>' +
+          '<option value="Processing">Processing</option>' +
+          '<option value="Shipped">Shipped</option>' +
+          '<option value="Delivered">Delivered</option>' +
+          '<option value="Cancelled">Cancelled</option>' +
+          "</select>" +
+          "</div>" +
+          '<div class="table-responsive mt-2">' +
           '<table class="table table-striped table-bordered align-middle">' +
           "<thead>" +
           "<tr>" +
@@ -707,58 +802,28 @@ $(function () {
           "<th>Status</th>" +
           "<th>Actions</th>" +
           "</tr>" +
-          "</thead><tbody>";
-
-        orders.forEach(function (order, idx) {
-          const created = order.createdAt
-            ? new Date(order.createdAt).toLocaleString()
-            : "-";
-          const itemsText = Array.isArray(order.items)
-            ? order.items
-                .map(function (it) {
-                  return (it.title || "Item") + " × " + (it.qty || 1);
-                })
-                .join(", ")
-            : "-";
-
-          html +=
-            "<tr>" +
-            "<td>" +
-            (idx + 1) +
-            "</td>" +
-            "<td>" +
-            (order._id || "") +
-            "</td>" +
-            "<td>" +
-            created +
-            "</td>" +
-            "<td>" +
-            itemsText +
-            "</td>" +
-            "<td>" +
-            (order.total || 0) +
-            "</td>" +
-            "<td>" +
-            (order.status || "created") +
-            "</td>" +
-            "<td>" +
-            '<button class="btn btn-sm btn-outline-primary btn-view-order" data-idx="' +
-            idx +
-            '">View</button>' +
-            "</td>" +
-            "</tr>";
-        });
-
-        html += "</tbody></table></div></div>";
+          "</thead>" +
+          '<tbody id="ordersTableBody">' +
+          buildRows("All") +
+          "</tbody></table></div></div>";
 
         $("#bodyContainer").html(html);
 
+        // filter change
+        $("#ddlOrderStatusFilter")
+          .off("change")
+          .on("change", function () {
+            const val = $(this).val() || "All";
+            $("#ordersTableBody").html(buildRows(val));
+          });
+
+        // view button (delegated)
         $("#bodyContainer")
           .off("click", ".btn-view-order")
           .on("click", ".btn-view-order", function (e) {
             e.preventDefault();
-            const idx = Number($(this).data("idx"));
-            const order = orders[idx];
+            const rowIndex = Number($(this).closest("tr").index());
+            const order = orders[rowIndex];
             renderOrderDetails(order);
           });
       })
