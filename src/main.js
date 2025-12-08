@@ -1516,6 +1516,244 @@ $(function () {
   }
 
   /* =========================
+ * ADMIN DASHBOARD
+ * ======================= */
+
+function renderStatusBadge(status) {
+  const s = (status || "").toLowerCase();
+  let cls = "badge bg-secondary";
+  if (s === "created") cls = "badge bg-secondary";
+  else if (s === "processing") cls = "badge bg-warning text-dark";
+  else if (s === "shipped") cls = "badge bg-info text-dark";
+  else if (s === "delivered") cls = "badge bg-success";
+  else if (s === "cancelled") cls = "badge bg-danger";
+  return '<span class="' + cls + '">' + (status || "") + "</span>";
+}
+
+function loadAdminOrders() {
+  const statusSel = $("#adminFilterStatus").val() || "All";
+
+  $("#adminOrdersContainer").html(
+    '<div class="p-3 text-center">Loading orders...</div>'
+  );
+
+  const qs =
+    statusSel && statusSel !== "All"
+      ? "?status=" + encodeURIComponent(statusSel)
+      : "";
+
+  $.ajax({
+    method: "GET",
+    url: API_BASE + "/admin/orders" + qs,
+  })
+    .then(function (resp) {
+      if (!resp || resp.success === false) {
+        $("#adminOrdersContainer").html(
+          '<div class="p-3 text-danger">Unable to load orders</div>'
+        );
+        return;
+      }
+
+      const orders = resp.orders || [];
+      if (!orders.length) {
+        $("#adminOrdersContainer").html(
+          '<div class="p-3">No orders found.</div>'
+        );
+        return;
+      }
+
+      let html =
+        '<div class="table-responsive">' +
+        '<table class="table table-striped table-bordered align-middle">' +
+        "<thead><tr>" +
+        "<th>#</th>" +
+        "<th>Order ID</th>" +
+        "<th>Date</th>" +
+        "<th>Items</th>" +
+        "<th>Total (₹)</th>" +
+        "<th>Status</th>" +
+        "<th>Actions</th>" +
+        "</tr></thead><tbody>";
+
+      orders.forEach(function (order, idx) {
+        const created = order.createdAt
+          ? new Date(order.createdAt).toLocaleString()
+          : "-";
+
+        const itemsText = Array.isArray(order.items)
+          ? order.items
+              .map(function (it) {
+                return (it.title || "Item") + " × " + (it.qty || 1);
+              })
+              .join(", ")
+          : "-";
+
+        const statusSelectId = "selStatus_" + idx;
+
+        html +=
+          "<tr>" +
+          "<td>" +
+          (idx + 1) +
+          "</td>" +
+          "<td>" +
+          (order._id || "") +
+          "</td>" +
+          "<td>" +
+          created +
+          "</td>" +
+          "<td>" +
+          itemsText +
+          "</td>" +
+          "<td>" +
+          (order.total || 0) +
+          "</td>" +
+          "<td>" +
+          renderStatusBadge(order.status || "Created") +
+          "</td>" +
+          "<td>" +
+          '<select class="form-select form-select-sm admin-status" ' +
+          'data-id="' +
+          (order._id || "") +
+          '" id="' +
+          statusSelectId +
+          '">' +
+          '<option value="Created">Created</option>' +
+          '<option value="Processing">Processing</option>' +
+          '<option value="Shipped">Shipped</option>' +
+          '<option value="Delivered">Delivered</option>' +
+          '<option value="Cancelled">Cancelled</option>' +
+          "</select>" +
+          "</td>" +
+          "</tr>";
+      });
+
+      html += "</tbody></table></div>";
+
+      $("#adminOrdersContainer").html(html);
+
+      // current status select pe set karo
+      orders.forEach(function (order, idx) {
+        $("#selStatus_" + idx).val(order.status || "Created");
+      });
+
+      // change handler
+      $(".admin-status")
+        .off("change")
+        .on("change", function () {
+          const newStatus = $(this).val();
+          const orderId = $(this).data("id");
+
+          if (
+            !window.confirm(
+              "Change status of this order to '" + newStatus + "'?"
+            )
+          ) {
+            // cancel: prev value restore
+            $(this).val($(this).data("prev") || "Created");
+            return;
+          }
+
+          $(this).data("prev", newStatus);
+
+          fetch(
+            API_BASE +
+              "/orders/" +
+              encodeURIComponent(orderId) +
+              "/status",
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: newStatus }),
+            }
+          )
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (up) {
+              if (!up || up.success === false) {
+                alert(
+                  (up && up.message) || "Failed to update order status"
+                );
+              } else {
+                alert("Status updated");
+                loadAdminOrders();
+              }
+            })
+            .catch(function () {
+              alert("Error while updating status");
+            });
+        });
+    })
+    .catch(function () {
+      $("#adminOrdersContainer").html(
+        '<div class="p-3 text-danger">Error loading orders</div>'
+      );
+    });
+}
+
+// Admin login + page load
+function initAdminPage() {
+  // agar sessionStorage mein flag hai to direct login maan lo
+  if (sessionStorage.getItem("adminUser")) {
+    $("#adminLoginBox").hide();
+    $("#adminMain").show();
+    loadAdminOrders();
+    return;
+  }
+
+  $("#adminLoginBox").show();
+  $("#adminMain").hide();
+
+  $("#btnAdminLogin")
+    .off("click")
+    .on("click", function () {
+      const user = ($("#adminUser").val() || "").trim();
+      const pwd = ($("#adminPwd").val() || "").trim();
+
+      if (!user || !pwd) {
+        alert("Enter username and password");
+        return;
+      }
+
+      $.ajax({
+        method: "POST",
+        url: API_BASE + "/admin/login",
+        data: { username: user, password: pwd },
+      })
+        .then(function (resp) {
+          if (!resp || resp.success === false) {
+            alert((resp && resp.message) || "Login failed");
+            return;
+          }
+
+          sessionStorage.setItem("adminUser", resp.username || user);
+          $("#adminLoginBox").hide();
+          $("#adminMain").show();
+          loadAdminOrders();
+        })
+        .catch(function () {
+          alert("Admin login error");
+        });
+    });
+
+  $("#adminFilterStatus")
+    .off("change")
+    .on("change", function () {
+      loadAdminOrders();
+    });
+}
+
+// Navbar → Admin click
+$("#btnNavAdmin")
+  .off("click")
+  .on("click", function () {
+    $.ajax({ method: "GET", url: "/admin.html" }).then(function (resp) {
+      $("#bodyContainer").html(resp);
+      initAdminPage();
+    });
+  });
+
+  /* =========================
    * Initial sync on page load
    * ======================= */
 
