@@ -1,7 +1,6 @@
 /* eslint-disable no-unused-vars */
 /* global $, document */
 
-// Backend base URL
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
   "https://shopping-backend-jb5p.onrender.com";
@@ -9,14 +8,12 @@ const API_BASE =
 $(function () {
   let currentProducts = [];
 
-  /* =========================
-   * Common helpers
-   * ======================= */
+  /* HELPERS */
 
   function getCurrentUserId() {
     try {
       return $.cookie("userid") || null;
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -31,14 +28,12 @@ $(function () {
         }
         return raw;
       }
-
       if (/^public[\\/]/i.test(raw)) {
         return "/" + raw.replace(/^[\\/]+/, "");
       }
-
       const fname = raw.split(/[\\/]/).pop();
       return fname ? "/public/" + fname : "";
-    } catch (e) {
+    } catch {
       return "";
     }
   }
@@ -63,8 +58,8 @@ $(function () {
       if (filtered.length !== cart.length) {
         localStorage.setItem("cart", JSON.stringify(filtered));
       }
-    } catch (err) {
-      // ignore
+    } catch {
+      /* ignore */
     }
   }
 
@@ -76,8 +71,8 @@ $(function () {
       if (uid) {
         localStorage.setItem("cart_" + uid, JSON.stringify(arr));
       }
-    } catch (e) {
-      // ignore
+    } catch {
+      /* ignore */
     }
   }
 
@@ -89,7 +84,7 @@ $(function () {
         if (per) return JSON.parse(per || "[]");
       }
       return JSON.parse(localStorage.getItem("cart") || "[]");
-    } catch (e) {
+    } catch {
       return [];
     }
   }
@@ -101,24 +96,19 @@ $(function () {
       if (Array.isArray(cart)) {
         total = cart.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
       }
-
       if ($("#cartCount").length) {
         $("#cartCount").text(total);
       } else if ($("#btnCart").length) {
         $("#btnCart").text("Cart(" + total + ")");
       }
-    } catch (err) {
+    } catch {
       if ($("#cartCount").length) $("#cartCount").text(0);
     }
   }
 
-  sanitizeCart().then(function () {
-    updateCartCount();
-  });
+  sanitizeCart().then(updateCartCount);
 
-  /* =========================
-   * Register
-   * ======================= */
+  /* ========== REGISTER ========== */
 
   $("#btnNavRegister")
     .off("click")
@@ -181,9 +171,7 @@ $(function () {
       });
     });
 
-  /* =========================
-   * Login helper
-   * ======================= */
+  /* ========== LOGIN (helper) ========== */
 
   function attachLoginHandler(onSuccess) {
     $("#btnLogin")
@@ -220,8 +208,8 @@ $(function () {
             try {
               const per = localStorage.getItem("cart_" + uid);
               if (per) localStorage.setItem("cart", per);
-            } catch (e) {
-              // ignore
+            } catch {
+              /* ignore */
             }
 
             updateCartCount();
@@ -242,10 +230,6 @@ $(function () {
       });
   }
 
-  /* =========================
-   * Nav: Login
-   * ======================= */
-
   $("#btnNavLogin")
     .off("click")
     .on("click", function () {
@@ -257,9 +241,7 @@ $(function () {
         .catch(function () {});
     });
 
-  /* =========================
-   * Signout
-   * ======================= */
+  /* ========== SIGNOUT ========== */
 
   $("#btnSignout")
     .off("click")
@@ -271,8 +253,8 @@ $(function () {
         if (uid) {
           localStorage.setItem("cart_" + uid, JSON.stringify(cart));
         }
-      } catch (e) {
-        // ignore
+      } catch {
+        /* ignore */
       }
 
       $.removeCookie("userid", { path: "/" });
@@ -282,7 +264,7 @@ $(function () {
 
       alert("Signed out Successfully");
       $("#user").text("");
-      $("#btnSignout").text("Signout");
+      $("#btnSignout").text("Login");
 
       $.ajax({ method: "GET", url: "/login.html" })
         .then(function (resp) {
@@ -292,9 +274,7 @@ $(function () {
         .catch(function () {});
     });
 
-  /* =========================
-   * Profile page
-   * ======================= */
+  /* ========== PROFILE ========== */
 
   function loadProfilePage() {
     const uid = getCurrentUserId();
@@ -350,32 +330,21 @@ $(function () {
           return;
         }
 
-        const first = ($("#FirstName").val() || "").trim();
-        const last = ($("#LastName").val() || "").trim();
-        const email = ($("#Email").val() || "").trim();
-        const gender = $("#Gender").val() || "";
-        const addr = ($("#Address").val() || "").trim();
-        const pin = ($("#PostalCode").val() || "").trim();
-        const state = ($("#State").val() || "").trim();
-        const country = ($("#Country").val() || "").trim();
-        const mobile = ($("#Mobile").val() || "").trim();
-        const dob = $("#DateOfBirth").val() || null;
-        const pwd = ($("#Password").val() || "").trim();
-
         const payload = {
           UserId: uidInput,
-          FirstName: first,
-          LastName: last,
-          Email: email,
-          Gender: gender,
-          Address: addr,
-          PostalCode: pin,
-          State: state,
-          Country: country,
-          Mobile: mobile,
-          DateOfBirth: dob,
+          FirstName: ($("#FirstName").val() || "").trim(),
+          LastName: ($("#LastName").val() || "").trim(),
+          Email: ($("#Email").val() || "").trim(),
+          Gender: $("#Gender").val() || "",
+          Address: ($("#Address").val() || "").trim(),
+          PostalCode: ($("#PostalCode").val() || "").trim(),
+          State: ($("#State").val() || "").trim(),
+          Country: ($("#Country").val() || "").trim(),
+          Mobile: ($("#Mobile").val() || "").trim(),
+          DateOfBirth: $("#DateOfBirth").val() || null,
         };
 
+        const pwd = ($("#Password").val() || "").trim();
         if (pwd !== "") {
           payload.Password = pwd;
         }
@@ -389,9 +358,8 @@ $(function () {
             if (!r.ok) {
               return r.text().then((text) => {
                 try {
-                  const parsed = JSON.parse(text);
-                  return parsed;
-                } catch (e) {
+                  return JSON.parse(text);
+                } catch {
                   return { success: false, message: text || "Server error" };
                 }
               });
@@ -443,9 +411,7 @@ $(function () {
         .catch(function () {});
     });
 
-  /* =========================
-   * Nav: Shop
-   * ======================= */
+  /* ========== NAV: SHOP ========== */
 
   $("#btnNavShopping")
     .off("click")
@@ -470,9 +436,7 @@ $(function () {
       }
     });
 
-  /* =========================
-   * Nav: Categories
-   * ======================= */
+  /* ========== NAV: CATEGORIES ========== */
 
   $("#btnNavCategories")
     .off("click")
@@ -499,7 +463,8 @@ $(function () {
       }
     });
 
-  // footer quick links
+  /* footer links */
+
   $("#navShopF")
     .off("click")
     .on("click", function (e) {
@@ -514,9 +479,7 @@ $(function () {
       $("#btnNavRegister").click();
     });
 
-  /* =========================
-   * Orders (customer list + detail + cancel)
-   * ======================= */
+  /* ========== ORDERS (customer) ========== */
 
   function renderOrderDetails(order) {
     if (!order) {
@@ -562,8 +525,7 @@ $(function () {
     const html =
       '<div class="container my-4">' +
       '<h3 class="mb-3">Order Details</h3>' +
-      '<div class="card mb-3">' +
-      '<div class="card-body">' +
+      '<div class="card mb-3"><div class="card-body">' +
       "<p><strong>Order ID:</strong> " +
       (order._id || "") +
       "</p>" +
@@ -576,10 +538,8 @@ $(function () {
       "<p><strong>Total:</strong> ₹" +
       (order.total || 0) +
       "</p>" +
-      "</div>" +
-      "</div>" +
-      '<div class="card">' +
-      '<div class="card-body">' +
+      "</div></div>" +
+      '<div class="card"><div class="card-body">' +
       "<h5 class='card-title mb-3'>Items</h5>" +
       '<div class="table-responsive">' +
       '<table class="table table-striped table-bordered align-middle">' +
@@ -592,13 +552,10 @@ $(function () {
       "</tr></thead><tbody>" +
       itemsRows +
       "</tbody></table>" +
-      "</div>" +
-      "</div>" +
-      "</div>" +
+      "</div></div></div>" +
       '<div class="mt-3">' +
       '<button id="btnBackToOrders" class="btn btn-secondary">Back to My Orders</button>' +
-      "</div>" +
-      "</div>";
+      "</div></div>";
 
     $("#bodyContainer").html(html);
 
@@ -608,21 +565,6 @@ $(function () {
         e.preventDefault();
         showOrders();
       });
-  }
-
-  function getStatusBadgeClass(status) {
-    switch (status) {
-      case "Processing":
-        return "bg-warning text-dark";
-      case "Shipped":
-        return "bg-info text-dark";
-      case "Delivered":
-        return "bg-success";
-      case "Cancelled":
-        return "bg-danger";
-      default:
-        return "bg-secondary";
-    }
   }
 
   function showOrders() {
@@ -649,8 +591,8 @@ $(function () {
           return;
         }
 
-        let orders = resp.orders || [];
-        if (!orders.length) {
+        let allOrders = resp.orders || [];
+        if (!allOrders.length) {
           $("#bodyContainer").html(
             '<div class="p-4"><h4>No orders found</h4><p>You have not placed any orders yet.</p></div>'
           );
@@ -658,7 +600,7 @@ $(function () {
         }
 
         const ordersById = {};
-        orders.forEach(function (o) {
+        allOrders.forEach(function (o) {
           if (o._id) ordersById[String(o._id)] = o;
         });
 
@@ -676,8 +618,7 @@ $(function () {
           '<option value="Delivered">Delivered</option>' +
           '<option value="Cancelled">Cancelled</option>' +
           "</select>" +
-          "</div>" +
-          "</div>" +
+          "</div></div>" +
           '<div class="table-responsive mt-3">' +
           '<table class="table table-striped table-bordered align-middle">' +
           "<thead>" +
@@ -693,6 +634,21 @@ $(function () {
           "</thead><tbody id='ordersTableBody'></tbody></table></div></div>";
 
         $("#bodyContainer").html(html);
+
+        function getStatusBadgeClass(status) {
+          switch (status) {
+            case "Processing":
+              return "bg-warning text-dark";
+            case "Shipped":
+              return "bg-info text-dark";
+            case "Delivered":
+              return "bg-success";
+            case "Cancelled":
+              return "bg-danger";
+            default:
+              return "bg-secondary";
+          }
+        }
 
         function renderOrdersList(list) {
           const $tbody = $("#ordersTableBody");
@@ -718,8 +674,6 @@ $(function () {
 
             const status = order.status || "Created";
             const badgeClass = getStatusBadgeClass(status);
-
-            // customer can only cancel when Created/Processing
             const canCancel =
               status === "Created" || status === "Processing";
 
@@ -748,40 +702,39 @@ $(function () {
               "</span>" +
               "</td>" +
               "<td>" +
-              '<button class="btn btn-sm btn-outline-primary btn-view-order me-2" data-id="' +
+              '<button class="btn btn-sm btn-outline-primary me-2 btn-view-order" data-id="' +
               (order._id || "") +
-              '">View</button>' +
-              (canCancel
-                ? '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' +
-                  (order._id || "") +
-                  '">Cancel</button>'
-                : "") +
-              "</td>" +
-              "</tr>";
+              '">View</button>';
+
+            if (canCancel) {
+              rowsHtml +=
+                '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' +
+                (order._id || "") +
+                '">Cancel</button>';
+            }
+
+            rowsHtml += "</td></tr>";
           });
 
           $tbody.html(rowsHtml);
         }
 
-        // initial render
-        renderOrdersList(orders);
+        renderOrdersList(allOrders);
 
-        // filter change
         $("#orderStatusFilter")
           .off("change")
           .on("change", function () {
             const val = $(this).val();
             if (val === "All") {
-              renderOrdersList(orders);
+              renderOrdersList(allOrders);
             } else {
-              const filtered = orders.filter(function (o) {
+              const filtered = allOrders.filter(function (o) {
                 return (o.status || "Created") === val;
               });
               renderOrdersList(filtered);
             }
           });
 
-        // view button
         $("#bodyContainer")
           .off("click", ".btn-view-order")
           .on("click", ".btn-view-order", function (e) {
@@ -791,12 +744,14 @@ $(function () {
             renderOrderDetails(order);
           });
 
-        // cancel button
+        // CANCEL button (customer)
         $("#bodyContainer")
           .off("click", ".btn-cancel-order")
           .on("click", ".btn-cancel-order", function (e) {
             e.preventDefault();
             const orderId = String($(this).data("id"));
+            if (!orderId) return;
+
             if (
               !window.confirm(
                 "Are you sure you want to cancel this order?"
@@ -817,10 +772,26 @@ $(function () {
               }
             )
               .then((r) => r.json())
-              .then((data) => {
+              .then(function (data) {
                 if (data && data.success) {
                   alert("Order cancelled.");
-                  showOrders(); // reload list
+                  // update local copy
+                  allOrders = allOrders.map(function (o) {
+                    if (String(o._id) === orderId) {
+                      o.status = "Cancelled";
+                    }
+                    return o;
+                  });
+                  ordersById[orderId].status = "Cancelled";
+                  const currentFilter = $("#orderStatusFilter").val();
+                  if (currentFilter === "All") {
+                    renderOrdersList(allOrders);
+                  } else {
+                    const filtered = allOrders.filter(function (o) {
+                      return (o.status || "Created") === currentFilter;
+                    });
+                    renderOrdersList(filtered);
+                  }
                 } else {
                   alert(
                     (data && data.message) ||
@@ -828,8 +799,8 @@ $(function () {
                   );
                 }
               })
-              .catch((err) => {
-                console.error("Cancel order error:", err);
+              .catch(function (err) {
+                console.error("Cancel error:", err);
                 alert("Cancel failed. Please try again.");
               });
           });
@@ -848,9 +819,8 @@ $(function () {
       showOrders();
     });
 
-  /* =========================
-   * Cart + checkout
-   * ======================= */
+  /* ========== CART + CHECKOUT ========== */
+  // (yahan se aapke purane working cart/checkout ka code hi hai – maine logic change nahi kiya)
 
   function showCart(attempt) {
     attempt = attempt || 0;
@@ -858,7 +828,7 @@ $(function () {
     let cart;
     try {
       cart = loadCartForCurrentUser();
-    } catch (e) {
+    } catch {
       cart = [];
     }
 
@@ -897,7 +867,7 @@ $(function () {
           let newCart;
           try {
             newCart = loadCartForCurrentUser();
-          } catch (e) {
+          } catch {
             newCart = [];
           }
 
@@ -1172,9 +1142,7 @@ $(function () {
       showCart();
     });
 
-  /* =========================
-   * Products + categories
-   * ======================= */
+  /* ========== PRODUCTS + CATEGORIES ========== */
 
   function renderProducts(list) {
     $("#productCatalog").empty();
@@ -1342,10 +1310,6 @@ $(function () {
       });
   }
 
-  /* =========================
-   * Product detail
-   * ======================= */
-
   function showProductDetails(productId) {
     $.ajax({ method: "GET", url: API_BASE + "/getproducts" })
       .then(function (products) {
@@ -1401,24 +1365,20 @@ $(function () {
           "<p>" +
           description +
           "</p>" +
-          "<p>" +
-          "<strong>Rating:</strong> " +
+          "<p><strong>Rating:</strong> " +
           '<span class="stars" style="--rating:' +
           (Number(rating) || 0) +
           '"></span> ' +
           '<span class="rating-value">(' +
           (Number(rating) || "NA") +
-          ")</span>" +
-          "</p>" +
+          ")</span></p>" +
           '<div class="mt-3">' +
           '<button id="btnAddToCart" data-id="' +
           idVal +
           '" class="btn btn-primary me-2">Add to Cart</button>' +
           '<button id="btnBackToCatalog" class="btn btn-outline-secondary">Back to Catalog</button>' +
           "</div>" +
-          "</div>" +
-          "</div>" +
-          "</div>";
+          "</div></div></div>";
 
         $("#bodyContainer").html(html);
 
@@ -1461,9 +1421,7 @@ $(function () {
       });
   }
 
-  /* =========================
-   * ADMIN DASHBOARD
-   * ======================= */
+  /* ========== ADMIN DASHBOARD ========== */
 
   function renderStatusBadge(status) {
     const s = (status || "").toLowerCase();
@@ -1609,9 +1567,7 @@ $(function () {
                 body: JSON.stringify({ status: newStatus }),
               }
             )
-              .then(function (r) {
-                return r.json();
-              })
+              .then((r) => r.json())
               .then(function (up) {
                 if (!up || up.success === false) {
                   alert(
@@ -1693,9 +1649,7 @@ $(function () {
       });
     });
 
-  /* =========================
-   * Initial on load
-   * ======================= */
+  /* ========== INITIAL SETUP ON PAGE LOAD ========== */
 
   try {
     const uid = getCurrentUserId();
@@ -1707,8 +1661,8 @@ $(function () {
       $("#user").text(uid);
       $("#btnSignout").text("Signout");
     }
-  } catch (e) {
-    // ignore
+  } catch {
+    /* ignore */
   }
 
   updateCartCount();
