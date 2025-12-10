@@ -589,7 +589,7 @@ function showOrders() {
 
   $.ajax({
     method: "GET",
-    url: API_BASE + "/orders/" + encodeURIComponent(uid),
+    url: API_BASE + "/orders/user/" + encodeURIComponent(uid),
   })
     .then(function (resp) {
       if (!resp || resp.success === false) {
@@ -659,11 +659,6 @@ function showOrders() {
         }
       }
 
-      function canCancel(order) {
-        const st = order.status || "Created";
-        return st === "Created" || st === "Processing";
-      }
-
       function renderOrdersList(list) {
         const $tbody = $("#ordersTableBody");
         if (!list || !list.length) {
@@ -688,6 +683,9 @@ function showOrders() {
 
           const status = order.status || "Created";
           const badgeClass = getStatusBadgeClass(status);
+
+          const canCancel =
+            status === "Created" || status === "Processing";
 
           rowsHtml +=
             "<tr>" +
@@ -716,14 +714,16 @@ function showOrders() {
             "<td>" +
             '<button class="btn btn-sm btn-outline-primary btn-view-order" data-id="' +
             (order._id || "") +
-            '">View</button>' +
-            (canCancel(order)
-              ? ' <button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' +
-                (order._id || "") +
-                '">Cancel</button>'
-              : "") +
-            "</td>" +
-            "</tr>";
+            '">View</button> ';
+
+          if (canCancel) {
+            rowsHtml +=
+              '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' +
+              (order._id || "") +
+              '">Cancel</button>';
+          }
+
+          rowsHtml += "</td></tr>";
         });
 
         $tbody.html(rowsHtml);
@@ -760,29 +760,23 @@ function showOrders() {
       // cancel button (customer)
       $("#bodyContainer")
         .off("click", ".btn-cancel-order")
-        .on("click", ".btn-cancel-order", function (e) {
-          e.preventDefault();
+        .on("click", ".btn-cancel-order", function () {
           const orderId = String($(this).data("id"));
           const order = ordersById[orderId];
+
           if (!order) {
-            alert("Order not found in list.");
+            alert("Order not found in local list.");
             return;
           }
 
-          const currentStatus = order.status || "Created";
-          if (
-            currentStatus === "Shipped" ||
-            currentStatus === "Delivered" ||
-            currentStatus === "Cancelled"
-          ) {
+          const st = order.status || "Created";
+          if (st === "Shipped" || st === "Delivered" || st === "Cancelled") {
             alert("This order can no longer be cancelled.");
             return;
           }
 
           if (
-            !window.confirm(
-              "Are you sure you want to cancel this order?"
-            )
+            !window.confirm("Are you sure you want to cancel this order?")
           ) {
             return;
           }
@@ -801,35 +795,41 @@ function showOrders() {
             .then(function (r) {
               return r.json();
             })
-            .then(function (data) {
-              if (data && data.success) {
-                alert("Order cancelled.");
-                ordersById[orderId].status = "Cancelled";
-                allOrders = allOrders.map(function (o) {
-                  if (String(o._id) === orderId) {
-                    o.status = "Cancelled";
-                  }
-                  return o;
-                });
-
-                const currentFilter = $("#orderStatusFilter").val();
-                const listToShow =
-                  currentFilter === "All"
-                    ? allOrders
-                    : allOrders.filter(function (o) {
-                        return (o.status || "Created") === currentFilter;
-                      });
-                renderOrdersList(listToShow);
-              } else {
+            .then(function (resp2) {
+              if (!resp2 || resp2.success === false) {
                 alert(
-                  (data && data.message) ||
-                    "Failed to cancel order. Please try again."
+                  (resp2 && resp2.message) ||
+                    "Failed to cancel the order."
                 );
+                return;
+              }
+
+              alert("Order cancelled.");
+
+              // local copy update
+              if (ordersById[orderId]) {
+                ordersById[orderId].status = "Cancelled";
+              }
+              allOrders = allOrders.map(function (o) {
+                if (String(o._id) === orderId) {
+                  o.status = "Cancelled";
+                }
+                return o;
+              });
+
+              const currentFilter = $("#orderStatusFilter").val();
+              if (currentFilter === "All") {
+                renderOrdersList(allOrders);
+              } else {
+                const filtered = allOrders.filter(function (o) {
+                  return (o.status || "Created") === currentFilter;
+                });
+                renderOrdersList(filtered);
               }
             })
             .catch(function (err) {
               console.error("Cancel order error:", err);
-              alert("Cancel failed. Please try again.");
+              alert("Error while cancelling order.");
             });
         });
     })
@@ -964,10 +964,12 @@ function loadAdminOrders() {
 
       $("#adminOrdersContainer").html(html);
 
+      // set initial select values
       orders.forEach(function (order, idx) {
         $("#selStatus_" + idx).val(order.status || "Created");
       });
 
+      // change handler
       $(".admin-status")
         .off("change")
         .on("change", function () {
@@ -1004,6 +1006,7 @@ function loadAdminOrders() {
                 alert(
                   (up && up.message) || "Failed to update order status"
                 );
+                loadAdminOrders();
               } else {
                 alert("Status updated");
                 loadAdminOrders();
@@ -1011,6 +1014,7 @@ function loadAdminOrders() {
             })
             .catch(function () {
               alert("Error while updating status");
+              loadAdminOrders();
             });
         });
     })
@@ -1021,7 +1025,6 @@ function loadAdminOrders() {
     });
 }
 
-// Admin login + page load
 function initAdminPage() {
   if (sessionStorage.getItem("adminUser")) {
     $("#adminLoginBox").hide();
