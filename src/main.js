@@ -599,18 +599,23 @@ function showOrders() {
         return;
       }
 
-      let allOrders = resp.orders || [];
-      if (!allOrders.length) {
+      // use global variables so other handlers can access
+      window.allOrders = resp.orders || [];
+
+      if (!window.allOrders.length) {
         $("#bodyContainer").html(
           '<div class="p-4"><h4>No orders found</h4><p>You have not placed any orders yet.</p></div>'
         );
         return;
       }
 
-      const ordersById = {};
-      allOrders.forEach(function (o) {
-        if (o._id) ordersById[String(o._id)] = o;
+      // build index by id
+      window.ordersById = {};
+      window.allOrders.forEach(function (o) {
+        if (o._id) window.ordersById[String(o._id)] = o;
       });
+
+      const ordersById = window.ordersById;
 
       let html =
         '<div class="container my-4">' +
@@ -713,13 +718,13 @@ function showOrders() {
             "</td>" +
             "<td>" +
             '<button class="btn btn-sm btn-outline-primary btn-view-order" data-id="' +
-            (order._id || "") +
+            String(order._id || "") +
             '">View</button> ';
 
           if (canCancel) {
             rowsHtml +=
               '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' +
-              (order._id || "") +
+              String(order._id || "") +
               '">Cancel</button>';
           }
 
@@ -730,7 +735,7 @@ function showOrders() {
       }
 
       // initial render
-      renderOrdersList(allOrders);
+      renderOrdersList(window.allOrders);
 
       // filter change
       $("#orderStatusFilter")
@@ -738,9 +743,9 @@ function showOrders() {
         .on("change", function () {
           const val = $(this).val();
           if (val === "All") {
-            renderOrdersList(allOrders);
+            renderOrdersList(window.allOrders);
           } else {
-            const filtered = allOrders.filter(function (o) {
+            const filtered = window.allOrders.filter(function (o) {
               return (o.status || "Created") === val;
             });
             renderOrdersList(filtered);
@@ -757,79 +762,78 @@ function showOrders() {
           renderOrderDetails(order);
         });
 
-      // cancel button (customer)
+      // cancel button (customer) -- REPLACED robust handler
       $("#bodyContainer")
         .off("click", ".btn-cancel-order")
         .on("click", ".btn-cancel-order", function () {
-          const orderId = String($(this).data("id"));
-          const order = ordersById[orderId];
+          const rawId = $(this).data("id") || $(this).attr("data-id") || "";
+          const orderId = String(rawId || "").trim();
 
-          if (!order) {
-            alert("Order not found in local list.");
+          if (!orderId) {
+            console.error("Cancel clicked but orderId missing for element:", this);
+            alert("Order id missing. Please try again.");
             return;
           }
 
-          const st = order.status || "Created";
+          const st = (window.ordersById && window.ordersById[orderId] && window.ordersById[orderId].status) || "Created";
           if (st === "Shipped" || st === "Delivered" || st === "Cancelled") {
             alert("This order can no longer be cancelled.");
             return;
           }
 
-          if (
-            !window.confirm("Are you sure you want to cancel this order?")
-          ) {
+          if (!window.confirm("Are you sure you want to cancel this order?")) {
             return;
           }
 
-          fetch(
-            API_BASE +
-              "/orders/" +
-              encodeURIComponent(orderId) +
-              "/status",
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "Cancelled" }),
-            }
-          )
-            .then(function (r) {
-              return r.json();
-            })
-            .then(function (resp2) {
-              if (!resp2 || resp2.success === false) {
-                alert(
-                  (resp2 && resp2.message) ||
-                    "Failed to cancel the order."
-                );
+          const url = API_BASE + "/orders/" + encodeURIComponent(orderId) + "/status";
+          const payload = { status: "Cancelled" };
+
+          console.log("DEBUG: Cancelling order ->", url, "payload:", payload);
+
+          fetch(url, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+            .then(async (r) => {
+              let json = null;
+              try { json = await r.json(); } catch (e) { /* ignore parse error */ }
+              console.log("DEBUG: Cancel response (status, json):", r.status, json);
+
+              if (!r.ok) {
+                const msg = (json && (json.message || json.error)) || ("Server error " + r.status);
+                alert("Failed to cancel the order: " + msg);
+                return;
+              }
+
+              if (json && json.success === false) {
+                alert(json.message || "Failed to cancel the order.");
                 return;
               }
 
               alert("Order cancelled.");
 
-              // local copy update
-              if (ordersById[orderId]) {
-                ordersById[orderId].status = "Cancelled";
+              if (window.ordersById && window.ordersById[orderId]) window.ordersById[orderId].status = "Cancelled";
+              if (window.allOrders && Array.isArray(window.allOrders)) {
+                window.allOrders = window.allOrders.map(function (o) {
+                  if (String(o._id) === orderId) o.status = "Cancelled";
+                  return o;
+                });
               }
-              allOrders = allOrders.map(function (o) {
-                if (String(o._id) === orderId) {
-                  o.status = "Cancelled";
-                }
-                return o;
-              });
 
               const currentFilter = $("#orderStatusFilter").val();
               if (currentFilter === "All") {
-                renderOrdersList(allOrders);
+                renderOrdersList(window.allOrders || []);
               } else {
-                const filtered = allOrders.filter(function (o) {
+                const filtered = (window.allOrders || []).filter(function (o) {
                   return (o.status || "Created") === currentFilter;
                 });
                 renderOrdersList(filtered);
               }
             })
-            .catch(function (err) {
-              console.error("Cancel order error:", err);
-              alert("Error while cancelling order.");
+            .catch((err) => {
+              console.error("DEBUG: Cancel order fetch error:", err);
+              alert("Network error while cancelling order. Check console.");
             });
         });
     })
@@ -946,7 +950,7 @@ function loadAdminOrders() {
           "<td>" +
           '<select class="form-select form-select-sm admin-status" ' +
           'data-id="' +
-          (order._id || "") +
+          String(order._id || "") +
           '" id="' +
           statusSelectId +
           '">' +
@@ -969,51 +973,60 @@ function loadAdminOrders() {
         $("#selStatus_" + idx).val(order.status || "Created");
       });
 
-      // change handler
+      // change handler (REPLACED: robust)
       $(".admin-status")
         .off("change")
         .on("change", function () {
           const newStatus = $(this).val();
-          const orderId = $(this).data("id");
+          const rawId = $(this).data("id") || $(this).attr("data-id") || "";
+          const orderId = String(rawId || "").trim();
 
-          if (
-            !window.confirm(
-              "Change status of this order to '" + newStatus + "'?"
-            )
-          ) {
+          if (!orderId) {
+            console.error("Admin status change but orderId missing for element:", this);
+            alert("Order id missing. Please try again.");
+            $(this).val($(this).data("prev") || "Created");
+            return;
+          }
+
+          if (!window.confirm("Change status of this order to '" + newStatus + "'?")) {
             $(this).val($(this).data("prev") || "Created");
             return;
           }
 
           $(this).data("prev", newStatus);
 
-          fetch(
-            API_BASE +
-              "/orders/" +
-              encodeURIComponent(orderId) +
-              "/status",
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: newStatus }),
-            }
-          )
-            .then(function (r) {
-              return r.json();
-            })
-            .then(function (up) {
-              if (!up || up.success === false) {
-                alert(
-                  (up && up.message) || "Failed to update order status"
-                );
+          const url = API_BASE + "/orders/" + encodeURIComponent(orderId) + "/status";
+          const payload = { status: newStatus };
+
+          console.log("DEBUG: Admin PATCH ->", url, "payload:", payload);
+
+          fetch(url, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+            .then(async (r) => {
+              let json = null;
+              try { json = await r.json(); } catch (e) { /* ignore */ }
+              console.log("DEBUG: Admin PATCH response:", r.status, json);
+
+              if (!r.ok) {
+                alert((json && (json.message || json.error)) || "Failed to update order status.");
                 loadAdminOrders();
-              } else {
-                alert("Status updated");
-                loadAdminOrders();
+                return;
               }
+              if (json && json.success === false) {
+                alert(json.message || "Failed to update order status");
+                loadAdminOrders();
+                return;
+              }
+
+              alert("Status updated");
+              loadAdminOrders();
             })
-            .catch(function () {
-              alert("Error while updating status");
+            .catch((err) => {
+              console.error("DEBUG: Admin update error:", err);
+              alert("Error while updating status (network).");
               loadAdminOrders();
             });
         });
