@@ -829,11 +829,14 @@ $(function () {
               .then((data) => {
                 if (data && data.success) {
                   alert("Order cancelled.");
-                  showOrders(); // reload list
+                  setTimeout(() => {
+                    showOrders(); 
+                  }, 300);
+                  
                 } else {
                   alert(
-                    (data && data.message) ||
-                      "Failed to cancel order. Please try again."
+                    ( data?.message) ||
+                      "Failed to cancel the order."
                   );
                 }
               })
