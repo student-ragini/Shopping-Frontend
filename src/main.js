@@ -816,7 +816,16 @@ $(function () {
                 body: JSON.stringify({ status: "Cancelled" }),
               }
             )
-              .then((r) => r.json())
+              .then((r) => {
+                // some servers send non-JSON message on error — handle gracefully
+                return r.text().then((text) => {
+                  try {
+                    return JSON.parse(text);
+                  } catch (e) {
+                    return { success: r.ok, message: text || (r.ok ? "OK" : "Server error") };
+                  }
+                });
+              })
               .then((data) => {
                 if (data && data.success) {
                   alert("Order cancelled.");
@@ -1694,7 +1703,7 @@ $(function () {
     });
 
   /* =========================
-   * Initial on load
+   *   Initial on load
    * ======================= */
 
   try {
