@@ -22,7 +22,10 @@ $(function () {
     if (!raw) return "";
     try {
       if (/^https?:\/\//i.test(raw)) {
-        // keep absolute urls (fakestoreapi etc.)
+        if (/^(https?:\/\/)(127\.0\.0\.1|localhost)/i.test(raw)) {
+          const fname = raw.split("/").pop();
+          return fname ? "/public/" + fname : "";
+        }
         return raw;
       }
       if (/^public[\\/]/i.test(raw)) {
@@ -408,7 +411,7 @@ $(function () {
         .catch(function () {});
     });
 
-  /* ========== NAV: SHOP & CATEGORIES ========== */
+  /* ========== NAV: SHOP ========== */
 
   $("#btnNavShopping")
     .off("click")
@@ -432,6 +435,8 @@ $(function () {
         });
       }
     });
+
+  /* ========== NAV: CATEGORIES ========== */
 
   $("#btnNavCategories")
     .off("click")
@@ -604,8 +609,7 @@ function showOrders() {
 
       const ordersById = {};
       allOrders.forEach(function (o) {
-        const key = String(o._id || "");
-        if (key) ordersById[key] = o;
+        if (o._id) ordersById[String(o._id)] = o;
       });
 
       let html =
@@ -683,15 +687,13 @@ function showOrders() {
           const canCancel =
             status === "Created" || status === "Processing";
 
-          const orderIdStr = String(order._id || "");
-
           rowsHtml +=
             "<tr>" +
             "<td>" +
             (idx + 1) +
             "</td>" +
             "<td>" +
-            orderIdStr +
+            (order._id || "") +
             "</td>" +
             "<td>" +
             created +
@@ -711,13 +713,13 @@ function showOrders() {
             "</td>" +
             "<td>" +
             '<button class="btn btn-sm btn-outline-primary btn-view-order" data-id="' +
-            orderIdStr +
+            (order._id || "") +
             '">View</button> ';
 
           if (canCancel) {
             rowsHtml +=
               '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' +
-              orderIdStr +
+              (order._id || "") +
               '">Cancel</button>';
           }
 
@@ -752,23 +754,6 @@ function showOrders() {
           e.preventDefault();
           const id = String($(this).data("id"));
           const order = ordersById[id];
-          // If not found locally, attempt to fetch from server
-          if (!order) {
-            fetch(API_BASE + "/orders/" + encodeURIComponent(id))
-              .then((r) => r.json())
-              .then((resp) => {
-                if (resp && resp.success && resp.order) {
-                  renderOrderDetails(resp.order);
-                } else {
-                  alert("Order not found");
-                }
-              })
-              .catch((err) => {
-                console.error("Fetch single order error:", err);
-                alert("Unable to load order details");
-              });
-            return;
-          }
           renderOrderDetails(order);
         });
 
@@ -1101,6 +1086,7 @@ $("#btnNavAdmin")
   });
 
   /* ========== CART + CHECKOUT ========== */
+  // (yahan se aapke purane working cart/checkout ka code hi hai – maine logic change nahi kiya)
 
   function showCart(attempt) {
     attempt = attempt || 0;
