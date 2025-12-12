@@ -3,7 +3,7 @@
 
 const API_BASE =
   import.meta.env.VITE_API_BASE ||
-  "https://shopping-backend-jb5p.onrender.com"; // change to your local http://127.0.0.1:4400 during local dev
+  "https://shopping-backend-jb5p.onrender.com"; 
 
 $(function () {
   let currentProducts = [];
