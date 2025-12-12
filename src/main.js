@@ -1,20 +1,22 @@
 /* eslint-disable no-unused-vars */
 /* global $, document */
 
+// Backend base URL
 const API_BASE =
-  import.meta && import.meta.env && import.meta.env.VITE_API_BASE
-    ? import.meta.env.VITE_API_BASE
-    : (window && window.API_BASE) || "https://shopping-backend-jb5p.onrender.com";
+  import.meta.env.VITE_API_BASE ||
+  "https://shopping-backend-jb5p.onrender.com";
 
 $(function () {
   let currentProducts = [];
 
-  /* HELPERS */
+  /* =========================
+   * Common helpers
+   * ======================= */
 
   function getCurrentUserId() {
     try {
       return $.cookie("userid") || null;
-    } catch {
+    } catch (e) {
       return null;
     }
   }
@@ -29,12 +31,14 @@ $(function () {
         }
         return raw;
       }
+
       if (/^public[\\/]/i.test(raw)) {
         return "/" + raw.replace(/^[\\/]+/, "");
       }
+
       const fname = raw.split(/[\\/]/).pop();
       return fname ? "/public/" + fname : "";
-    } catch {
+    } catch (e) {
       return "";
     }
   }
@@ -59,8 +63,8 @@ $(function () {
       if (filtered.length !== cart.length) {
         localStorage.setItem("cart", JSON.stringify(filtered));
       }
-    } catch {
-      /* ignore */
+    } catch (err) {
+      // ignore
     }
   }
 
@@ -72,8 +76,8 @@ $(function () {
       if (uid) {
         localStorage.setItem("cart_" + uid, JSON.stringify(arr));
       }
-    } catch {
-      /* ignore */
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -85,7 +89,7 @@ $(function () {
         if (per) return JSON.parse(per || "[]");
       }
       return JSON.parse(localStorage.getItem("cart") || "[]");
-    } catch {
+    } catch (e) {
       return [];
     }
   }
@@ -97,19 +101,24 @@ $(function () {
       if (Array.isArray(cart)) {
         total = cart.reduce((sum, it) => sum + (Number(it.qty) || 0), 0);
       }
+
       if ($("#cartCount").length) {
         $("#cartCount").text(total);
       } else if ($("#btnCart").length) {
         $("#btnCart").text("Cart(" + total + ")");
       }
-    } catch {
+    } catch (err) {
       if ($("#cartCount").length) $("#cartCount").text(0);
     }
   }
 
-  sanitizeCart().then(updateCartCount);
+  sanitizeCart().then(function () {
+    updateCartCount();
+  });
 
-  /* ========== REGISTER ========== */
+  /* =========================
+   * Register
+   * ======================= */
 
   $("#btnNavRegister")
     .off("click")
@@ -172,7 +181,9 @@ $(function () {
       });
     });
 
-  /* ========== LOGIN (helper) ========== */
+  /* =========================
+   * Login helper
+   * ======================= */
 
   function attachLoginHandler(onSuccess) {
     $("#btnLogin")
@@ -209,8 +220,8 @@ $(function () {
             try {
               const per = localStorage.getItem("cart_" + uid);
               if (per) localStorage.setItem("cart", per);
-            } catch {
-              /* ignore */
+            } catch (e) {
+              // ignore
             }
 
             updateCartCount();
@@ -231,6 +242,10 @@ $(function () {
       });
   }
 
+  /* =========================
+   * Nav: Login
+   * ======================= */
+
   $("#btnNavLogin")
     .off("click")
     .on("click", function () {
@@ -242,7 +257,9 @@ $(function () {
         .catch(function () {});
     });
 
-  /* ========== SIGNOUT ========== */
+  /* =========================
+   * Signout
+   * ======================= */
 
   $("#btnSignout")
     .off("click")
@@ -254,8 +271,8 @@ $(function () {
         if (uid) {
           localStorage.setItem("cart_" + uid, JSON.stringify(cart));
         }
-      } catch {
-        /* ignore */
+      } catch (e) {
+        // ignore
       }
 
       $.removeCookie("userid", { path: "/" });
@@ -265,7 +282,7 @@ $(function () {
 
       alert("Signed out Successfully");
       $("#user").text("");
-      $("#btnSignout").text("Login");
+      $("#btnSignout").text("Signout");
 
       $.ajax({ method: "GET", url: "/login.html" })
         .then(function (resp) {
@@ -275,7 +292,9 @@ $(function () {
         .catch(function () {});
     });
 
-  /* ========== PROFILE ========== */
+  /* =========================
+   * Profile page
+   * ======================= */
 
   function loadProfilePage() {
     const uid = getCurrentUserId();
@@ -286,7 +305,7 @@ $(function () {
     }
 
     fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
-      .then((r) => safeParseResponse(r))
+      .then((r) => r.json())
       .then((resp) => {
         if (resp && resp.success && resp.customer) {
           const c = resp.customer;
@@ -331,21 +350,32 @@ $(function () {
           return;
         }
 
+        const first = ($("#FirstName").val() || "").trim();
+        const last = ($("#LastName").val() || "").trim();
+        const email = ($("#Email").val() || "").trim();
+        const gender = $("#Gender").val() || "";
+        const addr = ($("#Address").val() || "").trim();
+        const pin = ($("#PostalCode").val() || "").trim();
+        const state = ($("#State").val() || "").trim();
+        const country = ($("#Country").val() || "").trim();
+        const mobile = ($("#Mobile").val() || "").trim();
+        const dob = $("#DateOfBirth").val() || null;
+        const pwd = ($("#Password").val() || "").trim();
+
         const payload = {
           UserId: uidInput,
-          FirstName: ($("#FirstName").val() || "").trim(),
-          LastName: ($("#LastName").val() || "").trim(),
-          Email: ($("#Email").val() || "").trim(),
-          Gender: $("#Gender").val() || "",
-          Address: ($("#Address").val() || "").trim(),
-          PostalCode: ($("#PostalCode").val() || "").trim(),
-          State: ($("#State").val() || "").trim(),
-          Country: ($("#Country").val() || "").trim(),
-          Mobile: ($("#Mobile").val() || "").trim(),
-          DateOfBirth: $("#DateOfBirth").val() || null,
+          FirstName: first,
+          LastName: last,
+          Email: email,
+          Gender: gender,
+          Address: addr,
+          PostalCode: pin,
+          State: state,
+          Country: country,
+          Mobile: mobile,
+          DateOfBirth: dob,
         };
 
-        const pwd = ($("#Password").val() || "").trim();
         if (pwd !== "") {
           payload.Password = pwd;
         }
@@ -355,7 +385,19 @@ $(function () {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         })
-          .then((r) => safeParseResponse(r))
+          .then((r) => {
+            if (!r.ok) {
+              return r.text().then((text) => {
+                try {
+                  const parsed = JSON.parse(text);
+                  return parsed;
+                } catch (e) {
+                  return { success: false, message: text || "Server error" };
+                }
+              });
+            }
+            return r.json();
+          })
           .then((up) => {
             if (up && up.success) {
               alert(up.message || "Profile updated successfully.");
@@ -401,7 +443,9 @@ $(function () {
         .catch(function () {});
     });
 
-  /* ========== NAV: SHOP ========== */
+  /* =========================
+   * Nav: Shop
+   * ======================= */
 
   $("#btnNavShopping")
     .off("click")
@@ -426,7 +470,9 @@ $(function () {
       }
     });
 
-  /* ========== NAV: CATEGORIES ========== */
+  /* =========================
+   * Nav: Categories
+   * ======================= */
 
   $("#btnNavCategories")
     .off("click")
@@ -453,8 +499,7 @@ $(function () {
       }
     });
 
-  /* footer links */
-
+  // footer quick links
   $("#navShopF")
     .off("click")
     .on("click", function (e) {
@@ -469,37 +514,8 @@ $(function () {
       $("#btnNavRegister").click();
     });
 
-  /* safe response parser for fetch (handles non-json too) */
-  function safeParseResponse(response) {
-    if (!response) return Promise.resolve(null);
-    const ct = response.headers && response.headers.get && response.headers.get("content-type");
-    if (!response.ok) {
-      // try read text and parse
-      return response.text().then((txt) => {
-        try {
-          return JSON.parse(txt);
-        } catch {
-          return { success: false, message: txt || `HTTP ${response.status}` };
-        }
-      });
-    }
-    if (ct && ct.indexOf("application/json") !== -1) {
-      return response.json().catch((err) => {
-        console.warn("Failed to parse JSON:", err);
-        return { success: false, message: "Invalid JSON response" };
-      });
-    }
-    return response.text().then((txt) => {
-      try {
-        return JSON.parse(txt);
-      } catch {
-        return { success: true, message: txt };
-      }
-    });
-  }
-
   /* =========================
-   * Orders (list + detail + status change)
+   * Orders (customer list + detail + cancel)
    * ======================= */
 
   function renderOrderDetails(order) {
@@ -594,6 +610,21 @@ $(function () {
       });
   }
 
+  function getStatusBadgeClass(status) {
+    switch (status) {
+      case "Processing":
+        return "bg-warning text-dark";
+      case "Shipped":
+        return "bg-info text-dark";
+      case "Delivered":
+        return "bg-success";
+      case "Cancelled":
+        return "bg-danger";
+      default:
+        return "bg-secondary";
+    }
+  }
+
   function showOrders() {
     const uid = getCurrentUserId();
     if (!uid) {
@@ -608,7 +639,7 @@ $(function () {
 
     $.ajax({
       method: "GET",
-      url: API_BASE + "/orders/user/" + encodeURIComponent(uid),
+      url: API_BASE + "/orders/" + encodeURIComponent(uid),
     })
       .then(function (resp) {
         if (!resp || resp.success === false) {
@@ -618,8 +649,8 @@ $(function () {
           return;
         }
 
-        let allOrders = resp.orders || [];
-        if (!allOrders.length) {
+        let orders = resp.orders || [];
+        if (!orders.length) {
           $("#bodyContainer").html(
             '<div class="p-4"><h4>No orders found</h4><p>You have not placed any orders yet.</p></div>'
           );
@@ -627,7 +658,7 @@ $(function () {
         }
 
         const ordersById = {};
-        allOrders.forEach(function (o) {
+        orders.forEach(function (o) {
           if (o._id) ordersById[String(o._id)] = o;
         });
 
@@ -663,21 +694,6 @@ $(function () {
 
         $("#bodyContainer").html(html);
 
-        function getStatusBadgeClass(status) {
-          switch (status) {
-            case "Processing":
-              return "bg-warning text-dark";
-            case "Shipped":
-              return "bg-info text-dark";
-            case "Delivered":
-              return "bg-success";
-            case "Cancelled":
-              return "bg-danger";
-            default:
-              return "bg-secondary";
-          }
-        }
-
         function renderOrdersList(list) {
           const $tbody = $("#ordersTableBody");
           if (!list || !list.length) {
@@ -703,6 +719,7 @@ $(function () {
             const status = order.status || "Created";
             const badgeClass = getStatusBadgeClass(status);
 
+            // customer can only cancel when Created/Processing
             const canCancel =
               status === "Created" || status === "Processing";
 
@@ -731,25 +748,23 @@ $(function () {
               "</span>" +
               "</td>" +
               "<td>" +
-              '<button class="btn btn-sm btn-outline-primary btn-view-order" data-id="' +
+              '<button class="btn btn-sm btn-outline-primary btn-view-order me-2" data-id="' +
               (order._id || "") +
-              '">View</button> ';
-
-            if (canCancel) {
-              rowsHtml +=
-                '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' +
-                (order._id || "") +
-                '">Cancel</button>';
-            }
-
-            rowsHtml += "</td></tr>";
+              '">View</button>' +
+              (canCancel
+                ? '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' +
+                  (order._id || "") +
+                  '">Cancel</button>'
+                : "") +
+              "</td>" +
+              "</tr>";
           });
 
           $tbody.html(rowsHtml);
         }
 
         // initial render
-        renderOrdersList(allOrders);
+        renderOrdersList(orders);
 
         // filter change
         $("#orderStatusFilter")
@@ -757,9 +772,9 @@ $(function () {
           .on("change", function () {
             const val = $(this).val();
             if (val === "All") {
-              renderOrdersList(allOrders);
+              renderOrdersList(orders);
             } else {
-              const filtered = allOrders.filter(function (o) {
+              const filtered = orders.filter(function (o) {
                 return (o.status || "Created") === val;
               });
               renderOrdersList(filtered);
@@ -776,32 +791,19 @@ $(function () {
             renderOrderDetails(order);
           });
 
-        // cancel button (customer)
+        // cancel button
         $("#bodyContainer")
           .off("click", ".btn-cancel-order")
-          .on("click", ".btn-cancel-order", function () {
+          .on("click", ".btn-cancel-order", function (e) {
+            e.preventDefault();
             const orderId = String($(this).data("id"));
-            const order = ordersById[orderId];
-
-            if (!order) {
-              alert("Order not found in local list.");
-              return;
-            }
-
-            const st = order.status || "Created";
-            if (st === "Shipped" || st === "Delivered" || st === "Cancelled") {
-              alert("This order can no longer be cancelled.");
-              return;
-            }
-
             if (
-              !window.confirm("Are you sure you want to cancel this order?")
+              !window.confirm(
+                "Are you sure you want to cancel this order?"
+              )
             ) {
               return;
             }
-
-            // debug log
-            console.log("Attempting to PATCH order status:", orderId);
 
             fetch(
               API_BASE +
@@ -814,45 +816,21 @@ $(function () {
                 body: JSON.stringify({ status: "Cancelled" }),
               }
             )
-              .then(function (r) {
-                // parse safely
-                return safeParseResponse(r);
-              })
-              .then(function (resp2) {
-                if (!resp2 || resp2.success === false) {
-                  alert(
-                    (resp2 && resp2.message) ||
-                      "Failed to cancel the order."
-                  );
-                  return;
-                }
-
-                alert("Order cancelled.");
-
-                // local copy update
-                if (ordersById[orderId]) {
-                  ordersById[orderId].status = "Cancelled";
-                }
-                allOrders = allOrders.map(function (o) {
-                  if (String(o._id) === orderId) {
-                    o.status = "Cancelled";
-                  }
-                  return o;
-                });
-
-                const currentFilter = $("#orderStatusFilter").val();
-                if (currentFilter === "All") {
-                  renderOrdersList(allOrders);
+              .then((r) => r.json())
+              .then((data) => {
+                if (data && data.success) {
+                  alert("Order cancelled.");
+                  showOrders(); // reload list
                 } else {
-                  const filtered = allOrders.filter(function (o) {
-                    return (o.status || "Created") === currentFilter;
-                  });
-                  renderOrdersList(filtered);
+                  alert(
+                    (data && data.message) ||
+                      "Failed to cancel order. Please try again."
+                  );
                 }
               })
-              .catch(function (err) {
+              .catch((err) => {
                 console.error("Cancel order error:", err);
-                alert("Error while cancelling order.");
+                alert("Cancel failed. Please try again.");
               });
           });
       })
@@ -863,7 +841,6 @@ $(function () {
       });
   }
 
-  // My Orders nav
   $("#btnNavOrders")
     .off("click")
     .on("click", function (e) {
@@ -872,248 +849,8 @@ $(function () {
     });
 
   /* =========================
-   * ADMIN DASHBOARD
+   * Cart + checkout
    * ======================= */
-
-  function renderStatusBadge(status) {
-    const s = (status || "").toLowerCase();
-    let cls = "badge bg-secondary";
-    if (s === "created") cls = "badge bg-secondary";
-    else if (s === "processing") cls = "badge bg-warning text-dark";
-    else if (s === "shipped") cls = "badge bg-info text-dark";
-    else if (s === "delivered") cls = "badge bg-success";
-    else if (s === "cancelled") cls = "badge bg-danger";
-    return '<span class="' + cls + '">' + (status || "") + "</span>";
-  }
-
-  function loadAdminOrders() {
-    const statusSel = $("#adminFilterStatus").val() || "All";
-
-    $("#adminOrdersContainer").html(
-      '<div class="p-3 text-center">Loading orders...</div>'
-    );
-
-    const qs =
-      statusSel && statusSel !== "All"
-        ? "?status=" + encodeURIComponent(statusSel)
-        : "";
-
-    $.ajax({
-      method: "GET",
-      url: API_BASE + "/admin/orders" + qs,
-    })
-      .then(function (resp) {
-        if (!resp || resp.success === false) {
-          $("#adminOrdersContainer").html(
-            '<div class="p-3 text-danger">Unable to load orders</div>'
-          );
-          return;
-        }
-
-        const orders = resp.orders || [];
-        if (!orders.length) {
-          $("#adminOrdersContainer").html(
-            '<div class="p-3">No orders found.</div>'
-          );
-          return;
-        }
-
-        let html =
-          '<div class="table-responsive">' +
-          '<table class="table table-striped table-bordered align-middle">' +
-          "<thead><tr>" +
-          "<th>#</th>" +
-          "<th>Order ID</th>" +
-          "<th>Date</th>" +
-          "<th>Items</th>" +
-          "<th>Total (₹)</th>" +
-          "<th>Status</th>" +
-          "<th>Actions</th>" +
-          "</tr></thead><tbody>";
-
-        orders.forEach(function (order, idx) {
-          const created = order.createdAt
-            ? new Date(order.createdAt).toLocaleString()
-            : "-";
-
-          const itemsText = Array.isArray(order.items)
-            ? order.items
-                .map(function (it) {
-                  return (it.title || "Item") + " × " + (it.qty || 1);
-                })
-                .join(", ")
-            : "-";
-
-          const statusSelectId = "selStatus_" + idx;
-
-          html +=
-            "<tr>" +
-            "<td>" +
-            (idx + 1) +
-            "</td>" +
-            "<td>" +
-            (order._id || "") +
-            "</td>" +
-            "<td>" +
-            created +
-            "</td>" +
-            "<td>" +
-            itemsText +
-            "</td>" +
-            "<td>" +
-            (order.total || 0) +
-            "</td>" +
-            "<td>" +
-            renderStatusBadge(order.status || "Created") +
-            "</td>" +
-            "<td>" +
-            '<select class="form-select form-select-sm admin-status" ' +
-            'data-id="' +
-            (order._id || "") +
-            '" id="' +
-            statusSelectId +
-            '">' +
-            '<option value="Created">Created</option>' +
-            '<option value="Processing">Processing</option>' +
-            '<option value="Shipped">Shipped</option>' +
-            '<option value="Delivered">Delivered</option>' +
-            '<option value="Cancelled">Cancelled</option>' +
-            "</select>" +
-            "</td>" +
-            "</tr>";
-        });
-
-        html += "</tbody></table></div>";
-
-        $("#adminOrdersContainer").html(html);
-
-        // set initial select values
-        orders.forEach(function (order, idx) {
-          $("#selStatus_" + idx).val(order.status || "Created");
-        });
-
-        // change handler
-        $(".admin-status")
-          .off("change")
-          .on("change", function () {
-            const newStatus = $(this).val();
-            const orderId = $(this).data("id");
-
-            if (
-              !window.confirm(
-                "Change status of this order to '" + newStatus + "'?"
-              )
-            ) {
-              $(this).val($(this).data("prev") || "Created");
-              return;
-            }
-
-            $(this).data("prev", newStatus);
-
-            // debug log
-            console.log("Admin changing order status:", orderId, "=>", newStatus);
-
-            fetch(
-              API_BASE +
-                "/orders/" +
-                encodeURIComponent(orderId) +
-                "/status",
-              {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: newStatus }),
-              }
-            )
-              .then(function (r) {
-                return safeParseResponse(r);
-              })
-              .then(function (up) {
-                if (!up || up.success === false) {
-                  alert(
-                    (up && up.message) || "Failed to update order status"
-                  );
-                  loadAdminOrders();
-                } else {
-                  alert("Status updated");
-                  loadAdminOrders();
-                }
-              })
-              .catch(function (err) {
-                console.error("Admin update status error:", err);
-                alert("Error while updating status");
-                loadAdminOrders();
-              });
-          });
-      })
-      .catch(function () {
-        $("#adminOrdersContainer").html(
-          '<div class="p-3 text-danger">Error loading orders</div>'
-        );
-      });
-  }
-
-  function initAdminPage() {
-    if (sessionStorage.getItem("adminUser")) {
-      $("#adminLoginBox").hide();
-      $("#adminMain").show();
-      loadAdminOrders();
-      return;
-    }
-
-    $("#adminLoginBox").show();
-    $("#adminMain").hide();
-
-    $("#btnAdminLogin")
-      .off("click")
-      .on("click", function () {
-        const user = ($("#adminUser").val() || "").trim();
-        const pwd = ($("#adminPwd").val() || "").trim();
-
-        if (!user || !pwd) {
-          alert("Enter username and password");
-          return;
-        }
-
-        $.ajax({
-          method: "POST",
-          url: API_BASE + "/admin/login",
-          data: { username: user, password: pwd },
-        })
-          .then(function (resp) {
-            if (!resp || resp.success === false) {
-              alert((resp && resp.message) || "Login failed");
-              return;
-            }
-
-            sessionStorage.setItem("adminUser", resp.username || user);
-            $("#adminLoginBox").hide();
-            $("#adminMain").show();
-            loadAdminOrders();
-          })
-          .catch(function () {
-            alert("Admin login error");
-          });
-      });
-
-    $("#adminFilterStatus")
-      .off("change")
-      .on("change", function () {
-        loadAdminOrders();
-      });
-  }
-
-  // Navbar → Admin click
-  $("#btnNavAdmin")
-    .off("click")
-    .on("click", function () {
-      $.ajax({ method: "GET", url: "/admin.html" }).then(function (resp) {
-        $("#bodyContainer").html(resp);
-        initAdminPage();
-      });
-    });
-
-  /* ========== CART + CHECKOUT ========== */
-  // (cart/checkout logic is kept compatible with API; see createorder endpoint improvements above)
 
   function showCart(attempt) {
     attempt = attempt || 0;
@@ -1121,7 +858,7 @@ $(function () {
     let cart;
     try {
       cart = loadCartForCurrentUser();
-    } catch {
+    } catch (e) {
       cart = [];
     }
 
@@ -1160,7 +897,7 @@ $(function () {
           let newCart;
           try {
             newCart = loadCartForCurrentUser();
-          } catch {
+          } catch (e) {
             newCart = [];
           }
 
@@ -1435,7 +1172,9 @@ $(function () {
       showCart();
     });
 
-  /* ========== PRODUCTS + CATEGORIES ========== */
+  /* =========================
+   * Products + categories
+   * ======================= */
 
   function renderProducts(list) {
     $("#productCatalog").empty();
@@ -1603,6 +1342,10 @@ $(function () {
       });
   }
 
+  /* =========================
+   * Product detail
+   * ======================= */
+
   function showProductDetails(productId) {
     $.ajax({ method: "GET", url: API_BASE + "/getproducts" })
       .then(function (products) {
@@ -1658,20 +1401,24 @@ $(function () {
           "<p>" +
           description +
           "</p>" +
-          "<p><strong>Rating:</strong> " +
+          "<p>" +
+          "<strong>Rating:</strong> " +
           '<span class="stars" style="--rating:' +
           (Number(rating) || 0) +
           '"></span> ' +
           '<span class="rating-value">(' +
           (Number(rating) || "NA") +
-          ")</span></p>" +
+          ")</span>" +
+          "</p>" +
           '<div class="mt-3">' +
           '<button id="btnAddToCart" data-id="' +
           idVal +
           '" class="btn btn-primary me-2">Add to Cart</button>' +
           '<button id="btnBackToCatalog" class="btn btn-outline-secondary">Back to Catalog</button>' +
           "</div>" +
-          "</div></div></div>";
+          "</div>" +
+          "</div>" +
+          "</div>";
 
         $("#bodyContainer").html(html);
 
@@ -1714,7 +1461,241 @@ $(function () {
       });
   }
 
-  /* ========== INITIAL SETUP ON PAGE LOAD ========== */
+  /* =========================
+   * ADMIN DASHBOARD
+   * ======================= */
+
+  function renderStatusBadge(status) {
+    const s = (status || "").toLowerCase();
+    let cls = "badge bg-secondary";
+    if (s === "created") cls = "badge bg-secondary";
+    else if (s === "processing") cls = "badge bg-warning text-dark";
+    else if (s === "shipped") cls = "badge bg-info text-dark";
+    else if (s === "delivered") cls = "badge bg-success";
+    else if (s === "cancelled") cls = "badge bg-danger";
+    return '<span class="' + cls + '">' + (status || "") + "</span>";
+  }
+
+  function loadAdminOrders() {
+    const statusSel = $("#adminFilterStatus").val() || "All";
+
+    $("#adminOrdersContainer").html(
+      '<div class="p-3 text-center">Loading orders...</div>'
+    );
+
+    const qs =
+      statusSel && statusSel !== "All"
+        ? "?status=" + encodeURIComponent(statusSel)
+        : "";
+
+    $.ajax({
+      method: "GET",
+      url: API_BASE + "/admin/orders" + qs,
+    })
+      .then(function (resp) {
+        if (!resp || resp.success === false) {
+          $("#adminOrdersContainer").html(
+            '<div class="p-3 text-danger">Unable to load orders</div>'
+          );
+          return;
+        }
+
+        const orders = resp.orders || [];
+        if (!orders.length) {
+          $("#adminOrdersContainer").html(
+            '<div class="p-3">No orders found.</div>'
+          );
+          return;
+        }
+
+        let html =
+          '<div class="table-responsive">' +
+          '<table class="table table-striped table-bordered align-middle">' +
+          "<thead><tr>" +
+          "<th>#</th>" +
+          "<th>Order ID</th>" +
+          "<th>Date</th>" +
+          "<th>Items</th>" +
+          "<th>Total (₹)</th>" +
+          "<th>Status</th>" +
+          "<th>Actions</th>" +
+          "</tr></thead><tbody>";
+
+        orders.forEach(function (order, idx) {
+          const created = order.createdAt
+            ? new Date(order.createdAt).toLocaleString()
+            : "-";
+
+          const itemsText = Array.isArray(order.items)
+            ? order.items
+                .map(function (it) {
+                  return (it.title || "Item") + " × " + (it.qty || 1);
+                })
+                .join(", ")
+            : "-";
+
+          const statusSelectId = "selStatus_" + idx;
+
+          html +=
+            "<tr>" +
+            "<td>" +
+            (idx + 1) +
+            "</td>" +
+            "<td>" +
+            (order._id || "") +
+            "</td>" +
+            "<td>" +
+            created +
+            "</td>" +
+            "<td>" +
+            itemsText +
+            "</td>" +
+            "<td>" +
+            (order.total || 0) +
+            "</td>" +
+            "<td>" +
+            renderStatusBadge(order.status || "Created") +
+            "</td>" +
+            "<td>" +
+            '<select class="form-select form-select-sm admin-status" ' +
+            'data-id="' +
+            (order._id || "") +
+            '" id="' +
+            statusSelectId +
+            '">' +
+            '<option value="Created">Created</option>' +
+            '<option value="Processing">Processing</option>' +
+            '<option value="Shipped">Shipped</option>' +
+            '<option value="Delivered">Delivered</option>' +
+            '<option value="Cancelled">Cancelled</option>' +
+            "</select>" +
+            "</td>" +
+            "</tr>";
+        });
+
+        html += "</tbody></table></div>";
+
+        $("#adminOrdersContainer").html(html);
+
+        orders.forEach(function (order, idx) {
+          $("#selStatus_" + idx).val(order.status || "Created");
+        });
+
+        $(".admin-status")
+          .off("change")
+          .on("change", function () {
+            const newStatus = $(this).val();
+            const orderId = $(this).data("id");
+
+            if (
+              !window.confirm(
+                "Change status of this order to '" + newStatus + "'?"
+              )
+            ) {
+              $(this).val($(this).data("prev") || "Created");
+              return;
+            }
+
+            $(this).data("prev", newStatus);
+
+            fetch(
+              API_BASE +
+                "/orders/" +
+                encodeURIComponent(orderId) +
+                "/status",
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
+              }
+            )
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function (up) {
+                if (!up || up.success === false) {
+                  alert(
+                    (up && up.message) || "Failed to update order status"
+                  );
+                } else {
+                  alert("Status updated");
+                  loadAdminOrders();
+                }
+              })
+              .catch(function () {
+                alert("Error while updating status");
+              });
+          });
+      })
+      .catch(function () {
+        $("#adminOrdersContainer").html(
+          '<div class="p-3 text-danger">Error loading orders</div>'
+        );
+      });
+  }
+
+  function initAdminPage() {
+    if (sessionStorage.getItem("adminUser")) {
+      $("#adminLoginBox").hide();
+      $("#adminMain").show();
+      loadAdminOrders();
+      return;
+    }
+
+    $("#adminLoginBox").show();
+    $("#adminMain").hide();
+
+    $("#btnAdminLogin")
+      .off("click")
+      .on("click", function () {
+        const user = ($("#adminUser").val() || "").trim();
+        const pwd = ($("#adminPwd").val() || "").trim();
+
+        if (!user || !pwd) {
+          alert("Enter username and password");
+          return;
+        }
+
+        $.ajax({
+          method: "POST",
+          url: API_BASE + "/admin/login",
+          data: { username: user, password: pwd },
+        })
+          .then(function (resp) {
+            if (!resp || resp.success === false) {
+              alert((resp && resp.message) || "Login failed");
+              return;
+            }
+
+            sessionStorage.setItem("adminUser", resp.username || user);
+            $("#adminLoginBox").hide();
+            $("#adminMain").show();
+            loadAdminOrders();
+          })
+          .catch(function () {
+            alert("Admin login error");
+          });
+      });
+
+    $("#adminFilterStatus")
+      .off("change")
+      .on("change", function () {
+        loadAdminOrders();
+      });
+  }
+
+  $("#btnNavAdmin")
+    .off("click")
+    .on("click", function () {
+      $.ajax({ method: "GET", url: "/admin.html" }).then(function (resp) {
+        $("#bodyContainer").html(resp);
+        initAdminPage();
+      });
+    });
+
+  /* =========================
+   * Initial on load
+   * ======================= */
 
   try {
     const uid = getCurrentUserId();
@@ -1726,8 +1707,8 @@ $(function () {
       $("#user").text(uid);
       $("#btnSignout").text("Signout");
     }
-  } catch {
-    /* ignore */
+  } catch (e) {
+    // ignore
   }
 
   updateCartCount();
