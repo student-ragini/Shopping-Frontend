@@ -2,8 +2,9 @@
 /* global $, document */
 
 const API_BASE =
-  import.meta.env.VITE_API_BASE ||
-  "https://shopping-backend-jb5p.onrender.com"; 
+  import.meta && import.meta.env && import.meta.env.VITE_API_BASE
+    ? import.meta.env.VITE_API_BASE
+    : (window && window.API_BASE) || "https://shopping-backend-jb5p.onrender.com";
 
 $(function () {
   let currentProducts = [];
@@ -285,7 +286,7 @@ $(function () {
     }
 
     fetch(API_BASE + "/customers/" + encodeURIComponent(uid))
-      .then((r) => r.json())
+      .then((r) => safeParseResponse(r))
       .then((resp) => {
         if (resp && resp.success && resp.customer) {
           const c = resp.customer;
@@ -354,18 +355,7 @@ $(function () {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         })
-          .then((r) => {
-            if (!r.ok) {
-              return r.text().then((text) => {
-                try {
-                  return JSON.parse(text);
-                } catch {
-                  return { success: false, message: text || "Server error" };
-                }
-              });
-            }
-            return r.json();
-          })
+          .then((r) => safeParseResponse(r))
           .then((up) => {
             if (up && up.success) {
               alert(up.message || "Profile updated successfully.");
@@ -479,200 +469,473 @@ $(function () {
       $("#btnNavRegister").click();
     });
 
-/* =========================
- * Orders (list + detail + status change)
- * ======================= */
-
-function renderOrderDetails(order) {
-  if (!order) {
-    alert("Order not found.");
-    return;
+  /* safe response parser for fetch (handles non-json too) */
+  function safeParseResponse(response) {
+    if (!response) return Promise.resolve(null);
+    const ct = response.headers && response.headers.get && response.headers.get("content-type");
+    if (!response.ok) {
+      // try read text and parse
+      return response.text().then((txt) => {
+        try {
+          return JSON.parse(txt);
+        } catch {
+          return { success: false, message: txt || `HTTP ${response.status}` };
+        }
+      });
+    }
+    if (ct && ct.indexOf("application/json") !== -1) {
+      return response.json().catch((err) => {
+        console.warn("Failed to parse JSON:", err);
+        return { success: false, message: "Invalid JSON response" };
+      });
+    }
+    return response.text().then((txt) => {
+      try {
+        return JSON.parse(txt);
+      } catch {
+        return { success: true, message: txt };
+      }
+    });
   }
 
-  const created = order.createdAt
-    ? new Date(order.createdAt).toLocaleString()
-    : "-";
+  /* =========================
+   * Orders (list + detail + status change)
+   * ======================= */
 
-  const itemsRows =
-    Array.isArray(order.items) && order.items.length
-      ? order.items
-          .map(function (it, i) {
-            const title = it.title || "Item " + (i + 1);
-            const qty = it.qty || 1;
-            const price = it.unitPrice || it.price || 0;
-            const total = Number(price) * Number(qty);
-            return (
+  function renderOrderDetails(order) {
+    if (!order) {
+      alert("Order not found.");
+      return;
+    }
+
+    const created = order.createdAt
+      ? new Date(order.createdAt).toLocaleString()
+      : "-";
+
+    const itemsRows =
+      Array.isArray(order.items) && order.items.length
+        ? order.items
+            .map(function (it, i) {
+              const title = it.title || "Item " + (i + 1);
+              const qty = it.qty || 1;
+              const price = it.unitPrice || it.price || 0;
+              const total = Number(price) * Number(qty);
+              return (
+                "<tr>" +
+                "<td>" +
+                (i + 1) +
+                "</td>" +
+                "<td>" +
+                title +
+                "</td>" +
+                "<td>" +
+                qty +
+                "</td>" +
+                "<td>" +
+                price +
+                "</td>" +
+                "<td>" +
+                total +
+                "</td>" +
+                "</tr>"
+              );
+            })
+            .join("")
+        : '<tr><td colspan="5" class="text-center">No items</td></tr>';
+
+    const html =
+      '<div class="container my-4">' +
+      '<h3 class="mb-3">Order Details</h3>' +
+      '<div class="card mb-3">' +
+      '<div class="card-body">' +
+      "<p><strong>Order ID:</strong> " +
+      (order._id || "") +
+      "</p>" +
+      "<p><strong>Date:</strong> " +
+      created +
+      "</p>" +
+      "<p><strong>Status:</strong> " +
+      (order.status || "Created") +
+      "</p>" +
+      "<p><strong>Total:</strong> ₹" +
+      (order.total || 0) +
+      "</p>" +
+      "</div>" +
+      "</div>" +
+      '<div class="card">' +
+      '<div class="card-body">' +
+      "<h5 class='card-title mb-3'>Items</h5>" +
+      '<div class="table-responsive">' +
+      '<table class="table table-striped table-bordered align-middle">' +
+      "<thead><tr>" +
+      "<th>#</th>" +
+      "<th>Item</th>" +
+      "<th>Qty</th>" +
+      "<th>Price (₹)</th>" +
+      "<th>Total (₹)</th>" +
+      "</tr></thead><tbody>" +
+      itemsRows +
+      "</tbody></table>" +
+      "</div>" +
+      "</div>" +
+      "</div>" +
+      '<div class="mt-3">' +
+      '<button id="btnBackToOrders" class="btn btn-secondary">Back to My Orders</button>' +
+      "</div>" +
+      "</div>";
+
+    $("#bodyContainer").html(html);
+
+    $("#btnBackToOrders")
+      .off("click")
+      .on("click", function (e) {
+        e.preventDefault();
+        showOrders();
+      });
+  }
+
+  function showOrders() {
+    const uid = getCurrentUserId();
+    if (!uid) {
+      alert("Please login to view your orders.");
+      $("#btnNavLogin").click();
+      return;
+    }
+
+    $("#bodyContainer").html(
+      '<div class="p-4 text-center">Loading your orders...</div>'
+    );
+
+    $.ajax({
+      method: "GET",
+      url: API_BASE + "/orders/user/" + encodeURIComponent(uid),
+    })
+      .then(function (resp) {
+        if (!resp || resp.success === false) {
+          $("#bodyContainer").html(
+            '<div class="p-4 text-danger">Unable to load orders.</div>'
+          );
+          return;
+        }
+
+        let allOrders = resp.orders || [];
+        if (!allOrders.length) {
+          $("#bodyContainer").html(
+            '<div class="p-4"><h4>No orders found</h4><p>You have not placed any orders yet.</p></div>'
+          );
+          return;
+        }
+
+        const ordersById = {};
+        allOrders.forEach(function (o) {
+          if (o._id) ordersById[String(o._id)] = o;
+        });
+
+        let html =
+          '<div class="container my-4">' +
+          '<div class="d-flex justify-content-between align-items-center">' +
+          '<h3 class="mb-0">My Orders</h3>' +
+          '<div class="d-flex align-items-center">' +
+          '<label class="me-2 mb-0 small">Filter by status:</label>' +
+          '<select id="orderStatusFilter" class="form-select form-select-sm" style="width:auto">' +
+          '<option value="All">All</option>' +
+          '<option value="Created">Created</option>' +
+          '<option value="Processing">Processing</option>' +
+          '<option value="Shipped">Shipped</option>' +
+          '<option value="Delivered">Delivered</option>' +
+          '<option value="Cancelled">Cancelled</option>' +
+          "</select>" +
+          "</div>" +
+          "</div>" +
+          '<div class="table-responsive mt-3">' +
+          '<table class="table table-striped table-bordered align-middle">' +
+          "<thead>" +
+          "<tr>" +
+          "<th>#</th>" +
+          "<th>Order ID</th>" +
+          "<th>Date</th>" +
+          "<th>Items</th>" +
+          "<th>Total (₹)</th>" +
+          "<th>Status</th>" +
+          "<th>Actions</th>" +
+          "</tr>" +
+          "</thead><tbody id='ordersTableBody'></tbody></table></div></div>";
+
+        $("#bodyContainer").html(html);
+
+        function getStatusBadgeClass(status) {
+          switch (status) {
+            case "Processing":
+              return "bg-warning text-dark";
+            case "Shipped":
+              return "bg-info text-dark";
+            case "Delivered":
+              return "bg-success";
+            case "Cancelled":
+              return "bg-danger";
+            default:
+              return "bg-secondary";
+          }
+        }
+
+        function renderOrdersList(list) {
+          const $tbody = $("#ordersTableBody");
+          if (!list || !list.length) {
+            $tbody.html(
+              '<tr><td colspan="7" class="text-center">No orders found</td></tr>'
+            );
+            return;
+          }
+
+          let rowsHtml = "";
+          list.forEach(function (order, idx) {
+            const created = order.createdAt
+              ? new Date(order.createdAt).toLocaleString()
+              : "-";
+            const itemsText = Array.isArray(order.items)
+              ? order.items
+                  .map(function (it) {
+                    return (it.title || "Item") + " × " + (it.qty || 1);
+                  })
+                  .join(", ")
+              : "-";
+
+            const status = order.status || "Created";
+            const badgeClass = getStatusBadgeClass(status);
+
+            const canCancel =
+              status === "Created" || status === "Processing";
+
+            rowsHtml +=
               "<tr>" +
               "<td>" +
-              (i + 1) +
+              (idx + 1) +
               "</td>" +
               "<td>" +
-              title +
+              (order._id || "") +
               "</td>" +
               "<td>" +
-              qty +
+              created +
               "</td>" +
               "<td>" +
-              price +
+              itemsText +
               "</td>" +
               "<td>" +
-              total +
+              (order.total || 0) +
               "</td>" +
-              "</tr>"
-            );
-          })
-          .join("")
-      : '<tr><td colspan="5" class="text-center">No items</td></tr>';
+              "<td>" +
+              '<span class="badge ' +
+              badgeClass +
+              '">' +
+              status +
+              "</span>" +
+              "</td>" +
+              "<td>" +
+              '<button class="btn btn-sm btn-outline-primary btn-view-order" data-id="' +
+              (order._id || "") +
+              '">View</button> ';
 
-  const html =
-    '<div class="container my-4">' +
-    '<h3 class="mb-3">Order Details</h3>' +
-    '<div class="card mb-3">' +
-    '<div class="card-body">' +
-    "<p><strong>Order ID:</strong> " +
-    (order._id || "") +
-    "</p>" +
-    "<p><strong>Date:</strong> " +
-    created +
-    "</p>" +
-    "<p><strong>Status:</strong> " +
-    (order.status || "Created") +
-    "</p>" +
-    "<p><strong>Total:</strong> ₹" +
-    (order.total || 0) +
-    "</p>" +
-    "</div>" +
-    "</div>" +
-    '<div class="card">' +
-    '<div class="card-body">' +
-    "<h5 class='card-title mb-3'>Items</h5>" +
-    '<div class="table-responsive">' +
-    '<table class="table table-striped table-bordered align-middle">' +
-    "<thead><tr>" +
-    "<th>#</th>" +
-    "<th>Item</th>" +
-    "<th>Qty</th>" +
-    "<th>Price (₹)</th>" +
-    "<th>Total (₹)</th>" +
-    "</tr></thead><tbody>" +
-    itemsRows +
-    "</tbody></table>" +
-    "</div>" +
-    "</div>" +
-    "</div>" +
-    '<div class="mt-3">' +
-    '<button id="btnBackToOrders" class="btn btn-secondary">Back to My Orders</button>' +
-    "</div>" +
-    "</div>";
+            if (canCancel) {
+              rowsHtml +=
+                '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' +
+                (order._id || "") +
+                '">Cancel</button>';
+            }
 
-  $("#bodyContainer").html(html);
+            rowsHtml += "</td></tr>";
+          });
 
-  $("#btnBackToOrders")
+          $tbody.html(rowsHtml);
+        }
+
+        // initial render
+        renderOrdersList(allOrders);
+
+        // filter change
+        $("#orderStatusFilter")
+          .off("change")
+          .on("change", function () {
+            const val = $(this).val();
+            if (val === "All") {
+              renderOrdersList(allOrders);
+            } else {
+              const filtered = allOrders.filter(function (o) {
+                return (o.status || "Created") === val;
+              });
+              renderOrdersList(filtered);
+            }
+          });
+
+        // view button
+        $("#bodyContainer")
+          .off("click", ".btn-view-order")
+          .on("click", ".btn-view-order", function (e) {
+            e.preventDefault();
+            const id = String($(this).data("id"));
+            const order = ordersById[id];
+            renderOrderDetails(order);
+          });
+
+        // cancel button (customer)
+        $("#bodyContainer")
+          .off("click", ".btn-cancel-order")
+          .on("click", ".btn-cancel-order", function () {
+            const orderId = String($(this).data("id"));
+            const order = ordersById[orderId];
+
+            if (!order) {
+              alert("Order not found in local list.");
+              return;
+            }
+
+            const st = order.status || "Created";
+            if (st === "Shipped" || st === "Delivered" || st === "Cancelled") {
+              alert("This order can no longer be cancelled.");
+              return;
+            }
+
+            if (
+              !window.confirm("Are you sure you want to cancel this order?")
+            ) {
+              return;
+            }
+
+            // debug log
+            console.log("Attempting to PATCH order status:", orderId);
+
+            fetch(
+              API_BASE +
+                "/orders/" +
+                encodeURIComponent(orderId) +
+                "/status",
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "Cancelled" }),
+              }
+            )
+              .then(function (r) {
+                // parse safely
+                return safeParseResponse(r);
+              })
+              .then(function (resp2) {
+                if (!resp2 || resp2.success === false) {
+                  alert(
+                    (resp2 && resp2.message) ||
+                      "Failed to cancel the order."
+                  );
+                  return;
+                }
+
+                alert("Order cancelled.");
+
+                // local copy update
+                if (ordersById[orderId]) {
+                  ordersById[orderId].status = "Cancelled";
+                }
+                allOrders = allOrders.map(function (o) {
+                  if (String(o._id) === orderId) {
+                    o.status = "Cancelled";
+                  }
+                  return o;
+                });
+
+                const currentFilter = $("#orderStatusFilter").val();
+                if (currentFilter === "All") {
+                  renderOrdersList(allOrders);
+                } else {
+                  const filtered = allOrders.filter(function (o) {
+                    return (o.status || "Created") === currentFilter;
+                  });
+                  renderOrdersList(filtered);
+                }
+              })
+              .catch(function (err) {
+                console.error("Cancel order error:", err);
+                alert("Error while cancelling order.");
+              });
+          });
+      })
+      .catch(function () {
+        $("#bodyContainer").html(
+          '<div class="p-4 text-danger">Error loading orders.</div>'
+        );
+      });
+  }
+
+  // My Orders nav
+  $("#btnNavOrders")
     .off("click")
     .on("click", function (e) {
       e.preventDefault();
       showOrders();
     });
-}
 
-function showOrders() {
-  const uid = getCurrentUserId();
-  if (!uid) {
-    alert("Please login to view your orders.");
-    $("#btnNavLogin").click();
-    return;
+  /* =========================
+   * ADMIN DASHBOARD
+   * ======================= */
+
+  function renderStatusBadge(status) {
+    const s = (status || "").toLowerCase();
+    let cls = "badge bg-secondary";
+    if (s === "created") cls = "badge bg-secondary";
+    else if (s === "processing") cls = "badge bg-warning text-dark";
+    else if (s === "shipped") cls = "badge bg-info text-dark";
+    else if (s === "delivered") cls = "badge bg-success";
+    else if (s === "cancelled") cls = "badge bg-danger";
+    return '<span class="' + cls + '">' + (status || "") + "</span>";
   }
 
-  $("#bodyContainer").html(
-    '<div class="p-4 text-center">Loading your orders...</div>'
-  );
+  function loadAdminOrders() {
+    const statusSel = $("#adminFilterStatus").val() || "All";
 
-  $.ajax({
-    method: "GET",
-    url: API_BASE + "/orders/user/" + encodeURIComponent(uid),
-  })
-    .then(function (resp) {
-      if (!resp || resp.success === false) {
-        $("#bodyContainer").html(
-          '<div class="p-4 text-danger">Unable to load orders.</div>'
-        );
-        return;
-      }
+    $("#adminOrdersContainer").html(
+      '<div class="p-3 text-center">Loading orders...</div>'
+    );
 
-      let allOrders = resp.orders || [];
-      if (!allOrders.length) {
-        $("#bodyContainer").html(
-          '<div class="p-4"><h4>No orders found</h4><p>You have not placed any orders yet.</p></div>'
-        );
-        return;
-      }
+    const qs =
+      statusSel && statusSel !== "All"
+        ? "?status=" + encodeURIComponent(statusSel)
+        : "";
 
-      const ordersById = {};
-      allOrders.forEach(function (o) {
-        if (o._id) ordersById[String(o._id)] = o;
-      });
-
-      let html =
-        '<div class="container my-4">' +
-        '<div class="d-flex justify-content-between align-items-center">' +
-        '<h3 class="mb-0">My Orders</h3>' +
-        '<div class="d-flex align-items-center">' +
-        '<label class="me-2 mb-0 small">Filter by status:</label>' +
-        '<select id="orderStatusFilter" class="form-select form-select-sm" style="width:auto">' +
-        '<option value="All">All</option>' +
-        '<option value="Created">Created</option>' +
-        '<option value="Processing">Processing</option>' +
-        '<option value="Shipped">Shipped</option>' +
-        '<option value="Delivered">Delivered</option>' +
-        '<option value="Cancelled">Cancelled</option>' +
-        "</select>" +
-        "</div>" +
-        "</div>" +
-        '<div class="table-responsive mt-3">' +
-        '<table class="table table-striped table-bordered align-middle">' +
-        "<thead>" +
-        "<tr>" +
-        "<th>#</th>" +
-        "<th>Order ID</th>" +
-        "<th>Date</th>" +
-        "<th>Items</th>" +
-        "<th>Total (₹)</th>" +
-        "<th>Status</th>" +
-        "<th>Actions</th>" +
-        "</tr>" +
-        "</thead><tbody id='ordersTableBody'></tbody></table></div></div>";
-
-      $("#bodyContainer").html(html);
-
-      function getStatusBadgeClass(status) {
-        switch (status) {
-          case "Processing":
-            return "bg-warning text-dark";
-          case "Shipped":
-            return "bg-info text-dark";
-          case "Delivered":
-            return "bg-success";
-          case "Cancelled":
-            return "bg-danger";
-          default:
-            return "bg-secondary";
-        }
-      }
-
-      function renderOrdersList(list) {
-        const $tbody = $("#ordersTableBody");
-        if (!list || !list.length) {
-          $tbody.html(
-            '<tr><td colspan="7" class="text-center">No orders found</td></tr>'
+    $.ajax({
+      method: "GET",
+      url: API_BASE + "/admin/orders" + qs,
+    })
+      .then(function (resp) {
+        if (!resp || resp.success === false) {
+          $("#adminOrdersContainer").html(
+            '<div class="p-3 text-danger">Unable to load orders</div>'
           );
           return;
         }
 
-        let rowsHtml = "";
-        list.forEach(function (order, idx) {
+        const orders = resp.orders || [];
+        if (!orders.length) {
+          $("#adminOrdersContainer").html(
+            '<div class="p-3">No orders found.</div>'
+          );
+          return;
+        }
+
+        let html =
+          '<div class="table-responsive">' +
+          '<table class="table table-striped table-bordered align-middle">' +
+          "<thead><tr>" +
+          "<th>#</th>" +
+          "<th>Order ID</th>" +
+          "<th>Date</th>" +
+          "<th>Items</th>" +
+          "<th>Total (₹)</th>" +
+          "<th>Status</th>" +
+          "<th>Actions</th>" +
+          "</tr></thead><tbody>";
+
+        orders.forEach(function (order, idx) {
           const created = order.createdAt
             ? new Date(order.createdAt).toLocaleString()
             : "-";
+
           const itemsText = Array.isArray(order.items)
             ? order.items
                 .map(function (it) {
@@ -681,13 +944,9 @@ function showOrders() {
                 .join(", ")
             : "-";
 
-          const status = order.status || "Created";
-          const badgeClass = getStatusBadgeClass(status);
+          const statusSelectId = "selStatus_" + idx;
 
-          const canCancel =
-            status === "Created" || status === "Processing";
-
-          rowsHtml +=
+          html +=
             "<tr>" +
             "<td>" +
             (idx + 1) +
@@ -705,385 +964,153 @@ function showOrders() {
             (order.total || 0) +
             "</td>" +
             "<td>" +
-            '<span class="badge ' +
-            badgeClass +
-            '">' +
-            status +
-            "</span>" +
+            renderStatusBadge(order.status || "Created") +
             "</td>" +
             "<td>" +
-            '<button class="btn btn-sm btn-outline-primary btn-view-order" data-id="' +
+            '<select class="form-select form-select-sm admin-status" ' +
+            'data-id="' +
             (order._id || "") +
-            '">View</button> ';
-
-          if (canCancel) {
-            rowsHtml +=
-              '<button class="btn btn-sm btn-outline-danger btn-cancel-order" data-id="' +
-              (order._id || "") +
-              '">Cancel</button>';
-          }
-
-          rowsHtml += "</td></tr>";
+            '" id="' +
+            statusSelectId +
+            '">' +
+            '<option value="Created">Created</option>' +
+            '<option value="Processing">Processing</option>' +
+            '<option value="Shipped">Shipped</option>' +
+            '<option value="Delivered">Delivered</option>' +
+            '<option value="Cancelled">Cancelled</option>' +
+            "</select>" +
+            "</td>" +
+            "</tr>";
         });
 
-        $tbody.html(rowsHtml);
-      }
+        html += "</tbody></table></div>";
 
-      // initial render
-      renderOrdersList(allOrders);
+        $("#adminOrdersContainer").html(html);
 
-      // filter change
-      $("#orderStatusFilter")
-        .off("change")
-        .on("change", function () {
-          const val = $(this).val();
-          if (val === "All") {
-            renderOrdersList(allOrders);
-          } else {
-            const filtered = allOrders.filter(function (o) {
-              return (o.status || "Created") === val;
-            });
-            renderOrdersList(filtered);
-          }
+        // set initial select values
+        orders.forEach(function (order, idx) {
+          $("#selStatus_" + idx).val(order.status || "Created");
         });
 
-      // view button
-      $("#bodyContainer")
-        .off("click", ".btn-view-order")
-        .on("click", ".btn-view-order", function (e) {
-          e.preventDefault();
-          const id = String($(this).data("id"));
-          const order = ordersById[id];
-          renderOrderDetails(order);
-        });
+        // change handler
+        $(".admin-status")
+          .off("change")
+          .on("change", function () {
+            const newStatus = $(this).val();
+            const orderId = $(this).data("id");
 
-      // cancel button (customer)
-      $("#bodyContainer")
-        .off("click", ".btn-cancel-order")
-        .on("click", ".btn-cancel-order", function () {
-          const orderId = String($(this).data("id"));
-          const order = ordersById[orderId];
-
-          if (!order) {
-            alert("Order not found in local list.");
-            return;
-          }
-
-          const st = order.status || "Created";
-          if (st === "Shipped" || st === "Delivered" || st === "Cancelled") {
-            alert("This order can no longer be cancelled.");
-            return;
-          }
-
-          if (
-            !window.confirm("Are you sure you want to cancel this order?")
-          ) {
-            return;
-          }
-
-          fetch(
-            API_BASE +
-              "/orders/" +
-              encodeURIComponent(orderId) +
-              "/status",
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "Cancelled" }),
+            if (
+              !window.confirm(
+                "Change status of this order to '" + newStatus + "'?"
+              )
+            ) {
+              $(this).val($(this).data("prev") || "Created");
+              return;
             }
-          )
-            .then(function (r) {
-              return r.json();
-            })
-            .then(function (resp2) {
-              if (!resp2 || resp2.success === false) {
-                alert(
-                  (resp2 && resp2.message) ||
-                    "Failed to cancel the order."
-                );
-                return;
+
+            $(this).data("prev", newStatus);
+
+            // debug log
+            console.log("Admin changing order status:", orderId, "=>", newStatus);
+
+            fetch(
+              API_BASE +
+                "/orders/" +
+                encodeURIComponent(orderId) +
+                "/status",
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
               }
-
-              alert("Order cancelled.");
-
-              // local copy update
-              if (ordersById[orderId]) {
-                ordersById[orderId].status = "Cancelled";
-              }
-              allOrders = allOrders.map(function (o) {
-                if (String(o._id) === orderId) {
-                  o.status = "Cancelled";
-                }
-                return o;
-              });
-
-              const currentFilter = $("#orderStatusFilter").val();
-              if (currentFilter === "All") {
-                renderOrdersList(allOrders);
-              } else {
-                const filtered = allOrders.filter(function (o) {
-                  return (o.status || "Created") === currentFilter;
-                });
-                renderOrdersList(filtered);
-              }
-            })
-            .catch(function (err) {
-              console.error("Cancel order error:", err);
-              alert("Error while cancelling order.");
-            });
-        });
-    })
-    .catch(function () {
-      $("#bodyContainer").html(
-        '<div class="p-4 text-danger">Error loading orders.</div>'
-      );
-    });
-}
-
-// My Orders nav
-$("#btnNavOrders")
-  .off("click")
-  .on("click", function (e) {
-    e.preventDefault();
-    showOrders();
-  });
-
-/* =========================
- * ADMIN DASHBOARD
- * ======================= */
-
-function renderStatusBadge(status) {
-  const s = (status || "").toLowerCase();
-  let cls = "badge bg-secondary";
-  if (s === "created") cls = "badge bg-secondary";
-  else if (s === "processing") cls = "badge bg-warning text-dark";
-  else if (s === "shipped") cls = "badge bg-info text-dark";
-  else if (s === "delivered") cls = "badge bg-success";
-  else if (s === "cancelled") cls = "badge bg-danger";
-  return '<span class="' + cls + '">' + (status || "") + "</span>";
-}
-
-function loadAdminOrders() {
-  const statusSel = $("#adminFilterStatus").val() || "All";
-
-  $("#adminOrdersContainer").html(
-    '<div class="p-3 text-center">Loading orders...</div>'
-  );
-
-  const qs =
-    statusSel && statusSel !== "All"
-      ? "?status=" + encodeURIComponent(statusSel)
-      : "";
-
-  $.ajax({
-    method: "GET",
-    url: API_BASE + "/admin/orders" + qs,
-  })
-    .then(function (resp) {
-      if (!resp || resp.success === false) {
-        $("#adminOrdersContainer").html(
-          '<div class="p-3 text-danger">Unable to load orders</div>'
-        );
-        return;
-      }
-
-      const orders = resp.orders || [];
-      if (!orders.length) {
-        $("#adminOrdersContainer").html(
-          '<div class="p-3">No orders found.</div>'
-        );
-        return;
-      }
-
-      let html =
-        '<div class="table-responsive">' +
-        '<table class="table table-striped table-bordered align-middle">' +
-        "<thead><tr>" +
-        "<th>#</th>" +
-        "<th>Order ID</th>" +
-        "<th>Date</th>" +
-        "<th>Items</th>" +
-        "<th>Total (₹)</th>" +
-        "<th>Status</th>" +
-        "<th>Actions</th>" +
-        "</tr></thead><tbody>";
-
-      orders.forEach(function (order, idx) {
-        const created = order.createdAt
-          ? new Date(order.createdAt).toLocaleString()
-          : "-";
-
-        const itemsText = Array.isArray(order.items)
-          ? order.items
-              .map(function (it) {
-                return (it.title || "Item") + " × " + (it.qty || 1);
-              })
-              .join(", ")
-          : "-";
-
-        const statusSelectId = "selStatus_" + idx;
-
-        html +=
-          "<tr>" +
-          "<td>" +
-          (idx + 1) +
-          "</td>" +
-          "<td>" +
-          (order._id || "") +
-          "</td>" +
-          "<td>" +
-          created +
-          "</td>" +
-          "<td>" +
-          itemsText +
-          "</td>" +
-          "<td>" +
-          (order.total || 0) +
-          "</td>" +
-          "<td>" +
-          renderStatusBadge(order.status || "Created") +
-          "</td>" +
-          "<td>" +
-          '<select class="form-select form-select-sm admin-status" ' +
-          'data-id="' +
-          (order._id || "") +
-          '" id="' +
-          statusSelectId +
-          '">' +
-          '<option value="Created">Created</option>' +
-          '<option value="Processing">Processing</option>' +
-          '<option value="Shipped">Shipped</option>' +
-          '<option value="Delivered">Delivered</option>' +
-          '<option value="Cancelled">Cancelled</option>' +
-          "</select>" +
-          "</td>" +
-          "</tr>";
-      });
-
-      html += "</tbody></table></div>";
-
-      $("#adminOrdersContainer").html(html);
-
-      // set initial select values
-      orders.forEach(function (order, idx) {
-        $("#selStatus_" + idx).val(order.status || "Created");
-      });
-
-      // change handler
-      $(".admin-status")
-        .off("change")
-        .on("change", function () {
-          const newStatus = $(this).val();
-          const orderId = $(this).data("id");
-
-          if (
-            !window.confirm(
-              "Change status of this order to '" + newStatus + "'?"
             )
-          ) {
-            $(this).val($(this).data("prev") || "Created");
-            return;
-          }
-
-          $(this).data("prev", newStatus);
-
-          fetch(
-            API_BASE +
-              "/orders/" +
-              encodeURIComponent(orderId) +
-              "/status",
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: newStatus }),
-            }
-          )
-            .then(function (r) {
-              return r.json();
-            })
-            .then(function (up) {
-              if (!up || up.success === false) {
-                alert(
-                  (up && up.message) || "Failed to update order status"
-                );
+              .then(function (r) {
+                return safeParseResponse(r);
+              })
+              .then(function (up) {
+                if (!up || up.success === false) {
+                  alert(
+                    (up && up.message) || "Failed to update order status"
+                  );
+                  loadAdminOrders();
+                } else {
+                  alert("Status updated");
+                  loadAdminOrders();
+                }
+              })
+              .catch(function (err) {
+                console.error("Admin update status error:", err);
+                alert("Error while updating status");
                 loadAdminOrders();
-              } else {
-                alert("Status updated");
-                loadAdminOrders();
-              }
-            })
-            .catch(function () {
-              alert("Error while updating status");
-              loadAdminOrders();
-            });
-        });
-    })
-    .catch(function () {
-      $("#adminOrdersContainer").html(
-        '<div class="p-3 text-danger">Error loading orders</div>'
-      );
-    });
-}
-
-function initAdminPage() {
-  if (sessionStorage.getItem("adminUser")) {
-    $("#adminLoginBox").hide();
-    $("#adminMain").show();
-    loadAdminOrders();
-    return;
+              });
+          });
+      })
+      .catch(function () {
+        $("#adminOrdersContainer").html(
+          '<div class="p-3 text-danger">Error loading orders</div>'
+        );
+      });
   }
 
-  $("#adminLoginBox").show();
-  $("#adminMain").hide();
+  function initAdminPage() {
+    if (sessionStorage.getItem("adminUser")) {
+      $("#adminLoginBox").hide();
+      $("#adminMain").show();
+      loadAdminOrders();
+      return;
+    }
 
-  $("#btnAdminLogin")
+    $("#adminLoginBox").show();
+    $("#adminMain").hide();
+
+    $("#btnAdminLogin")
+      .off("click")
+      .on("click", function () {
+        const user = ($("#adminUser").val() || "").trim();
+        const pwd = ($("#adminPwd").val() || "").trim();
+
+        if (!user || !pwd) {
+          alert("Enter username and password");
+          return;
+        }
+
+        $.ajax({
+          method: "POST",
+          url: API_BASE + "/admin/login",
+          data: { username: user, password: pwd },
+        })
+          .then(function (resp) {
+            if (!resp || resp.success === false) {
+              alert((resp && resp.message) || "Login failed");
+              return;
+            }
+
+            sessionStorage.setItem("adminUser", resp.username || user);
+            $("#adminLoginBox").hide();
+            $("#adminMain").show();
+            loadAdminOrders();
+          })
+          .catch(function () {
+            alert("Admin login error");
+          });
+      });
+
+    $("#adminFilterStatus")
+      .off("change")
+      .on("change", function () {
+        loadAdminOrders();
+      });
+  }
+
+  // Navbar → Admin click
+  $("#btnNavAdmin")
     .off("click")
     .on("click", function () {
-      const user = ($("#adminUser").val() || "").trim();
-      const pwd = ($("#adminPwd").val() || "").trim();
-
-      if (!user || !pwd) {
-        alert("Enter username and password");
-        return;
-      }
-
-      $.ajax({
-        method: "POST",
-        url: API_BASE + "/admin/login",
-        data: { username: user, password: pwd },
-      })
-        .then(function (resp) {
-          if (!resp || resp.success === false) {
-            alert((resp && resp.message) || "Login failed");
-            return;
-          }
-
-          sessionStorage.setItem("adminUser", resp.username || user);
-          $("#adminLoginBox").hide();
-          $("#adminMain").show();
-          loadAdminOrders();
-        })
-        .catch(function () {
-          alert("Admin login error");
-        });
+      $.ajax({ method: "GET", url: "/admin.html" }).then(function (resp) {
+        $("#bodyContainer").html(resp);
+        initAdminPage();
+      });
     });
-
-  $("#adminFilterStatus")
-    .off("change")
-    .on("change", function () {
-      loadAdminOrders();
-    });
-}
-
-// Navbar → Admin click
-$("#btnNavAdmin")
-  .off("click")
-  .on("click", function () {
-    $.ajax({ method: "GET", url: "/admin.html" }).then(function (resp) {
-      $("#bodyContainer").html(resp);
-      initAdminPage();
-    });
-  });
 
   /* ========== CART + CHECKOUT ========== */
   // (cart/checkout logic is kept compatible with API; see createorder endpoint improvements above)
