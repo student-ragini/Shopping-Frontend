@@ -1658,36 +1658,42 @@ $(function () {
     $("#adminMain").hide();
 
     $("#btnAdminLogin")
-      .off("click")
-      .on("click", function () {
-        const user = ($("#adminUser").val() || "").trim();
-        const pwd = ($("#adminPwd").val() || "").trim();
+  .off("click")
+  .on("click", function () {
+    const user = ($("#adminUser").val() || "").trim();
+    const pwd = ($("#adminPwd").val() || "").trim();
 
-        if (!user || !pwd) {
-          alert("Enter username and password");
+    if (!user || !pwd) {
+      alert("Enter username and password");
+      return;
+    }
+
+    fetch(API_BASE + "/admin/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        username: user,
+        password: pwd,
+      }),
+    })
+      .then((res) => res.json())
+      .then((resp) => {
+        if (!resp || resp.success === false) {
+          alert(resp?.message || "Admin login failed");
           return;
         }
 
-        $.ajax({
-          method: "POST",
-          url: API_BASE + "/admin/login",
-          data: { username: user, password: pwd },
-        })
-          .then(function (resp) {
-            if (!resp || resp.success === false) {
-              alert((resp && resp.message) || "Login failed");
-              return;
-            }
-
-            sessionStorage.setItem("adminUser", resp.username || user);
-            $("#adminLoginBox").hide();
-            $("#adminMain").show();
-            loadAdminOrders();
-          })
-          .catch(function () {
-            alert("Admin login error");
-          });
+        sessionStorage.setItem("adminUser", user);
+        $("#adminLoginBox").hide();
+        $("#adminMain").show();
+        loadAdminOrders();
+      })
+      .catch(() => {
+        alert("Admin login error");
       });
+  });
 
     $("#adminFilterStatus")
       .off("change")
