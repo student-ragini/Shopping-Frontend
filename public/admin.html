@@ -21,23 +21,27 @@
     <button id="btnAdminLogin">Login</button>
   </div>
 
-  <!-- Orders section (login ke baad) -->
-  <div id="adminMain" style="display:none; margin-top:20px;">
-    <h4>Orders</h4>
-
-    <div style="margin-bottom:10px;">
-      <label>Filter by status:</label>
-      <select id="adminFilterStatus">
-        <option value="All">All</option>
-        <option value="Created">Created</option>
-        <option value="Processing">Processing</option>
-        <option value="Shipped">Shipped</option>
-        <option value="Delivered">Delivered</option>
-        <option value="Cancelled">Cancelled</option>
-      </select>
+   <!-- Orders Table (login ke baad dikhega) -->
+  <div id="adminMain" style="display:none">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5>Orders</h5>
+      <div class="d-flex align-items-center">
+        <span class="me-2">Filter by status:</span>
+        <select
+          id="adminFilterStatus"
+          class="form-select form-select-sm"
+          style="width: 160px"
+        >
+          <option value="All">All</option>
+          <option value="Created">Created</option>
+          <option value="Processing">Processing</option>
+          <option value="Shipped">Shipped</option>
+          <option value="Delivered">Delivered</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+      </div>
     </div>
 
     <div id="adminOrdersContainer"></div>
   </div>
-
 </div>
