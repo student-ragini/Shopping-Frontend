@@ -1,44 +1,44 @@
 <!-- admin.html -->
 <div class="container my-4">
 
-  <!-- Heading -->
-  <h3 id="adminHeading" style="text-align:left;">
-    Admin Dashboard
-  </h3>
+  <!-- Page Heading -->
+  <h3 class="mb-3">Admin Dashboard</h3>
 
-  <!-- Admin Login -->
-  <div id="adminLoginBox">
-    <h4>Admin Login</h4>
+  <!-- ================= ADMIN LOGIN ================= -->
+  <div id="adminLoginBox" class="card p-3 mb-3" style="max-width:420px;">
+    <h4 class="mb-3">Admin Login</h4>
 
-    <dl>
-      <dt>Username</dt>
-      <dd><input type="text" id="adminUser" /></dd>
+    <div class="mb-2">
+      <label class="form-label">Username</label>
+      <input id="adminUser" class="form-control" />
+    </div>
 
-      <dt>Password</dt>
-      <dd><input type="password" id="adminPwd" /></dd>
-    </dl>
+    <div class="mb-3">
+      <label class="form-label">Password</label>
+      <input id="adminPwd" type="password" class="form-control" />
+    </div>
 
-    <button id="btnAdminLogin">Login</button>
+    <button id="btnAdminLogin" class="btn btn-primary">
+      Login
+    </button>
   </div>
 
-  <!-- Orders Section -->
+  <!-- ================= ADMIN MAIN ================= -->
   <div
     id="adminMain"
-    style="
-      display:none;
-      margin-top:20px;
-      background:#fff;
-      padding:15px;
-      border-radius:6px;
-      max-width:95%;
-    "
+    style="display:none;"
   >
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-      <h4>Orders</h4>
+    <!-- Orders Header -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0">Orders</h5>
 
-      <div>
-        <label>Filter by status:</label>
-        <select id="adminFilterStatus">
+      <div class="d-flex align-items-center">
+        <span class="me-2">Filter by status:</span>
+        <select
+          id="adminFilterStatus"
+          class="form-select form-select-sm"
+          style="width:150px;"
+        >
           <option value="All">All</option>
           <option value="Created">Created</option>
           <option value="Processing">Processing</option>
@@ -49,13 +49,12 @@
       </div>
     </div>
 
-    <!-- Table container -->
-    <div
-      id="adminOrdersContainer"
-      style="
-        margin-top:15px;
-        overflow-x:auto;
-      "
-    ></div>
+    <!-- Orders Table Card -->
+    <div class="card p-2">
+      <div
+        id="adminOrdersContainer"
+        style="overflow-x:auto;"
+      ></div>
+    </div>
   </div>
 </div>
