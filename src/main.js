@@ -1647,60 +1647,74 @@ $(function () {
   }
 
   function initAdminPage() {
-    if (sessionStorage.getItem("adminUser")) {
-      $("#adminLoginBox").hide();
-      $("#adminMain").show();
-      loadAdminOrders();
-      return;
-    }
 
+  // 🔹 Already logged in
+  if (sessionStorage.getItem("adminUser")) {
+    $("#adminLoginBox").hide();
+    $("#adminMain").show();
+    loadAdminOrders();
+  } else {
     $("#adminLoginBox").show();
     $("#adminMain").hide();
+  }
 
-    $("#btnAdminLogin")
+  // 🔹 Admin Login
+  $("#btnAdminLogin")
+    .off("click")
+    .on("click", function () {
+      const user = ($("#adminUser").val() || "").trim();
+      const pwd = ($("#adminPwd").val() || "").trim();
+
+      if (!user || !pwd) {
+        alert("Enter username and password");
+        return;
+      }
+
+      fetch(API_BASE + "/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user, password: pwd }),
+      })
+        .then((res) => res.json())
+        .then((resp) => {
+          if (!resp || resp.success === false) {
+            alert(resp?.message || "Admin login failed");
+            return;
+          }
+
+          sessionStorage.setItem("adminUser", user);
+          $("#adminLoginBox").hide();
+          $("#adminMain").show();
+          loadAdminOrders();
+        })
+        .catch(() => alert("Admin login error"));
+    });
+
+  // 🔹 Logout
+  $("#btnAdminLogout")
   .off("click")
   .on("click", function () {
-    const user = ($("#adminUser").val() || "").trim();
-    const pwd = ($("#adminPwd").val() || "").trim();
+    if (!confirm("Are you sure you want to logout?")) return;
 
-    if (!user || !pwd) {
-      alert("Enter username and password");
-      return;
-    }
+    // 🔹 session clear
+    sessionStorage.removeItem("adminUser");
 
-    fetch(API_BASE + "/admin/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        username: user,
-        password: pwd,
-      }),
-    })
-      .then((res) => res.json())
-      .then((resp) => {
-        if (!resp || resp.success === false) {
-          alert(resp?.message || "Admin login failed");
-          return;
-        }
+    // 🔹 INPUT FIELDS CLEAR (IMPORTANT)
+    $("#adminUser").val("");
+    $("#adminPwd").val("");
 
-        sessionStorage.setItem("adminUser", user);
-        $("#adminLoginBox").hide();
-        $("#adminMain").show();
-        loadAdminOrders();
-      })
-      .catch(() => {
-        alert("Admin login error");
-      });
+    // 🔹 UI switch
+    $("#adminMain").hide();
+    $("#adminLoginBox").show();
   });
 
-    $("#adminFilterStatus")
-      .off("change")
-      .on("change", function () {
-        loadAdminOrders();
-      });
-  }
+  // 🔹 Filter change
+  $("#adminFilterStatus")
+    .off("change")
+    .on("change", function () {
+      loadAdminOrders();
+    });
+}
 
   $("#btnNavAdmin")
     .off("click")
