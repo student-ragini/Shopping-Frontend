@@ -1477,239 +1477,132 @@ $(function () {
    * ADMIN DASHBOARD
    * ======================= */
 
-  function renderStatusBadge(status) {
-    const s = (status || "").toLowerCase();
-    let cls = "badge bg-secondary";
-    if (s === "created") cls = "badge bg-secondary";
-    else if (s === "processing") cls = "badge bg-warning text-dark";
-    else if (s === "shipped") cls = "badge bg-info text-dark";
-    else if (s === "delivered") cls = "badge bg-success";
-    else if (s === "cancelled") cls = "badge bg-danger";
-    return '<span class="' + cls + '">' + (status || "") + "</span>";
-  }
+function renderStatusBadge(status) {
+  const s = (status || "").toLowerCase();
+  let cls = "badge bg-secondary";
+  if (s === "processing") cls = "badge bg-warning text-dark";
+  else if (s === "shipped") cls = "badge bg-info text-dark";
+  else if (s === "delivered") cls = "badge bg-success";
+  else if (s === "cancelled") cls = "badge bg-danger";
+  return `<span class="${cls}">${status}</span>`;
+}
 
-  function loadAdminOrders() {
-    const statusSel = $("#adminFilterStatus").val() || "All";
+function loadAdminOrders() {
+  const statusSel = $("#adminFilterStatus").val() || "All";
 
-    $("#adminOrdersContainer").html(
-      '<div class="p-3 text-center">Loading orders...</div>'
-    );
+  $("#adminOrdersContainer").html("Loading orders...");
 
-    const qs =
-      statusSel && statusSel !== "All"
-        ? "?status=" + encodeURIComponent(statusSel)
-        : "";
+  const qs =
+    statusSel !== "All" ? `?status=${encodeURIComponent(statusSel)}` : "";
 
-    $.ajax({
-      method: "GET",
-      url: API_BASE + "/admin/orders" + qs,
-    })
-      .then(function (resp) {
-        if (!resp || resp.success === false) {
-          $("#adminOrdersContainer").html(
-            '<div class="p-3 text-danger">Unable to load orders</div>'
-          );
-          return;
-        }
+  fetch(API_BASE + "/admin/orders" + qs)
+    .then(res => res.json())
+    .then(resp => {
+      if (!resp.success || !resp.orders.length) {
+        $("#adminOrdersContainer").html("No orders found.");
+        return;
+      }
 
-        const orders = resp.orders || [];
-        if (!orders.length) {
-          $("#adminOrdersContainer").html(
-            '<div class="p-3">No orders found.</div>'
-          );
-          return;
-        }
+      let html = `
+        <table border="1" cellpadding="5">
+          <tr>
+            <th>#</th>
+            <th>Order ID</th>
+            <th>Date</th>
+            <th>Items</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>`;
 
-        let html =
-          '<div class="table-responsive">' +
-          '<table class="table table-striped table-bordered align-middle">' +
-          "<thead><tr>" +
-          "<th>#</th>" +
-          "<th>Order ID</th>" +
-          "<th>Date</th>" +
-          "<th>Items</th>" +
-          "<th>Total (₹)</th>" +
-          "<th>Status</th>" +
-          "<th>Actions</th>" +
-          "</tr></thead><tbody>";
-
-        orders.forEach(function (order, idx) {
-          const created = order.createdAt
-            ? new Date(order.createdAt).toLocaleString()
-            : "-";
-
-          const itemsText = Array.isArray(order.items)
-            ? order.items
-                .map(function (it) {
-                  return (it.title || "Item") + " × " + (it.qty || 1);
-                })
-                .join(", ")
-            : "-";
-
-          const statusSelectId = "selStatus_" + idx;
-
-          html +=
-            "<tr>" +
-            "<td>" +
-            (idx + 1) +
-            "</td>" +
-            "<td>" +
-            (order._id || "") +
-            "</td>" +
-            "<td>" +
-            created +
-            "</td>" +
-            "<td>" +
-            itemsText +
-            "</td>" +
-            "<td>" +
-            (order.total || 0) +
-            "</td>" +
-            "<td>" +
-            renderStatusBadge(order.status || "Created") +
-            "</td>" +
-            "<td>" +
-            '<select class="form-select form-select-sm admin-status" ' +
-            'data-id="' +
-            (order._id || "") +
-            '" id="' +
-            statusSelectId +
-            '">' +
-            '<option value="Created">Created</option>' +
-            '<option value="Processing">Processing</option>' +
-            '<option value="Shipped">Shipped</option>' +
-            '<option value="Delivered">Delivered</option>' +
-            '<option value="Cancelled">Cancelled</option>' +
-            "</select>" +
-            "</td>" +
-            "</tr>";
-        });
-
-        html += "</tbody></table></div>";
-
-        $("#adminOrdersContainer").html(html);
-
-        orders.forEach(function (order, idx) {
-          $("#selStatus_" + idx).val(order.status || "Created");
-        });
-
-        $(".admin-status")
-          .off("change")
-          .on("change", function () {
-            const newStatus = $(this).val();
-            const orderId = $(this).data("id");
-
-            if (
-              !window.confirm(
-                "Change status of this order to '" + newStatus + "'?"
-              )
-            ) {
-              $(this).val($(this).data("prev") || "Created");
-              return;
-            }
-
-            $(this).data("prev", newStatus);
-
-            fetch(
-              API_BASE +
-                "/orders/" +
-                encodeURIComponent(orderId) +
-                "/status",
-              {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: newStatus }),
-              }
-            )
-              .then(function (r) {
-                return r.json();
-              })
-              .then(function (up) {
-                if (!up || up.success === false) {
-                  alert(
-                    (up && up.message) || "Failed to update order status"
-                  );
-                } else {
-                  alert("Status updated");
-                  loadAdminOrders();
-                }
-              })
-              .catch(function () {
-                alert("Error while updating status");
-              });
-          });
-      })
-      .catch(function () {
-        $("#adminOrdersContainer").html(
-          '<div class="p-3 text-danger">Error loading orders</div>'
-        );
+      resp.orders.forEach((o, i) => {
+        const items = o.items.map(it => `${it.title} × ${it.qty}`).join(", ");
+        html += `
+          <tr>
+            <td>${i + 1}</td>
+            <td>${o._id}</td>
+            <td>${new Date(o.createdAt).toLocaleString()}</td>
+            <td>${items}</td>
+            <td>₹${o.total}</td>
+            <td>${renderStatusBadge(o.status)}</td>
+            <td>
+              <select class="admin-status" data-id="${o._id}">
+                <option ${o.status==="Created"?"selected":""}>Created</option>
+                <option ${o.status==="Processing"?"selected":""}>Processing</option>
+                <option ${o.status==="Shipped"?"selected":""}>Shipped</option>
+                <option ${o.status==="Delivered"?"selected":""}>Delivered</option>
+                <option ${o.status==="Cancelled"?"selected":""}>Cancelled</option>
+              </select>
+            </td>
+          </tr>`;
       });
+
+      html += "</table>";
+      $("#adminOrdersContainer").html(html);
+
+      $(".admin-status").on("change", function () {
+        const id = $(this).data("id");
+        const status = $(this).val();
+
+        fetch(API_BASE + "/orders/" + id + "/status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        }).then(() => loadAdminOrders());
+      });
+    });
+}
+
+function initAdminPage() {
+  if (sessionStorage.getItem("adminUser")) {
+    $("#adminHeading").text("Admin Dashboard");
+    $("#adminLoginBox").hide();
+    $("#adminMain").show();
+    loadAdminOrders();
+    return;
   }
 
-  function initAdminPage() {
-    if (sessionStorage.getItem("adminUser")) {
-      $("#adminLoginBox").hide();
-      $("#adminMain").show();
-      loadAdminOrders();
-      return;
-    }
+  $("#adminHeading").text("Admin Login");
+  $("#adminLoginBox").show();
+  $("#adminMain").hide();
 
-    $("#adminLoginBox").show();
-    $("#adminMain").hide();
+  $("#btnAdminLogin").off().on("click", function () {
+    const username = $("#adminUser").val().trim();
+    const password = $("#adminPwd").val().trim();
 
-    $("#btnAdminLogin")
-  .off("click")
-  .on("click", function () {
-    const user = ($("#adminUser").val() || "").trim();
-    const pwd = ($("#adminPwd").val() || "").trim();
-
-    if (!user || !pwd) {
-      alert("Enter username and password");
+    if (!username || !password) {
+      alert("Enter username & password");
       return;
     }
 
     fetch(API_BASE + "/admin/login", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        username: user,
-        password: pwd,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
     })
-      .then((res) => res.json())
-      .then((resp) => {
-        if (!resp || resp.success === false) {
-          alert(resp?.message || "Admin login failed");
+      .then(res => res.json())
+      .then(resp => {
+        if (!resp.success) {
+          alert(resp.message);
           return;
         }
 
-        sessionStorage.setItem("adminUser", user);
-        $("#adminLoginBox").hide();
-        $("#adminMain").show();
-        loadAdminOrders();
-      })
-      .catch(() => {
-        alert("Admin login error");
+        sessionStorage.setItem("adminUser", username);
+        initAdminPage();
       });
   });
 
-    $("#adminFilterStatus")
-      .off("change")
-      .on("change", function () {
-        loadAdminOrders();
-      });
-  }
+  $("#adminFilterStatus").off().on("change", loadAdminOrders);
+}
 
-  $("#btnNavAdmin")
-    .off("click")
-    .on("click", function () {
-      $.ajax({ method: "GET", url: "/admin.html" }).then(function (resp) {
-        $("#bodyContainer").html(resp);
-        initAdminPage();
-      });
+$("#btnNavAdmin").on("click", function () {
+  fetch("/admin.html")
+    .then(r => r.text())
+    .then(html => {
+      $("#bodyContainer").html(html);
+      initAdminPage();
     });
+});
 
   /* =========================
    *   Initial on load

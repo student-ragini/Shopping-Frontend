@@ -1,11 +1,11 @@
 <!-- admin.html -->
 <div class="container my-4">
-  <h3>Admin Dashboard</h3>
 
-  <!-- Admin Login -->
+  <!-- Dynamic Heading -->
+  <h3 id="adminHeading">Admin Login</h3>
+
+  <!-- Admin Login (Customer Login jaisa) -->
   <div id="adminLoginBox">
-    <h4>Admin Login</h4>
-
     <dl>
       <dt>Username</dt>
       <dd>
@@ -21,7 +21,7 @@
     <button id="btnAdminLogin">Login</button>
   </div>
 
-  <!-- Orders section -->
+  <!-- Orders section (login ke baad) -->
   <div id="adminMain" style="display:none; margin-top:20px;">
     <h4>Orders</h4>
 
@@ -39,4 +39,5 @@
 
     <div id="adminOrdersContainer"></div>
   </div>
+
 </div>
