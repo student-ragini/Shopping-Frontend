@@ -6,9 +6,14 @@ body {
   background-position: center center;
   background-attachment: fixed;
   background-color: #f4f5f6;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
 }
 
-/* Navbar / footer small rules */
+.min-vh-60 { 
+  min-height: 60vh; 
+}
+
+/* Navbar / footer */
 .navbar-brand i {
   font-size: 1.2rem;
   margin-right: 6px;
@@ -19,138 +24,238 @@ footer .footer-link:hover {
   color: #ffc107 !important;
 }
 
-.min-vh-60 {
-  min-height: 60vh;
-}
-
-.card .card-header p {
-  margin: 0;
-  font-weight: 600;
-  font-size: 0.95rem;
-}
-
 /* -------------------- Rating stars -------------------- */
 .stars {
-  --rating: 4; /* default, override inline */
+  --rating: 4;
   --percent: calc(var(--rating) / 5 * 100%);
   display: inline-block;
   font-size: 1.1rem;
-  line-height: 1;
-  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   position: relative;
   color: #4009f3;
-  user-select: none;
 }
 
 .stars::before {
   content: "★★★★★";
   letter-spacing: 3px;
-  display: block;
 }
 
 .stars::after {
   content: "★★★★★";
   position: absolute;
-  left: 0;
-  top: 0;
+  inset: 0;
   width: var(--percent);
   overflow: hidden;
   color: #f5b301;
   white-space: nowrap;
 }
 
-.rating-value {
-  margin-left: 8px;
-  color: #333;
-  font-size: 0.95rem;
-  vertical-align: middle;
-}
+/* ======================================================
+   PRODUCT CATALOG (2nd pic jaisa – OK)
+====================================================== */
 
-/* -------------------- Product grid & cards -------------------- */
 #productCatalog {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 20px;
   padding: 16px;
 }
 
+/* card */
 .product-card {
-  width: 220px;
-  background: rgba(233, 227, 227, 0.98);
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(30, 30, 30, 0.08);
-  overflow: hidden;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
-  cursor: pointer;
-  border: 1px solid rgba(0, 0, 0, 0.04);
 }
 
 .product-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 18px 32px rgba(30, 30, 30, 0.12);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+  transform: translateY(-3px);
 }
 
-.product-card img.card-img-top {
-  height: 200px;
-  width: 100%;
-  object-fit: cover;
-  display: block;
-  background: #f6f6f6;
-}
-
-.product-card .card-body {
-  padding: 10px 12px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.product-card .card-title {
-  font-size: 14px;
-  line-height: 1.2;
-  color: #111;
-  margin: 0 0 6px 0;
-  min-height: 34px;
-}
-
-.product-card .card-text {
-  font-size: 13px;
-  color: #090909;
-  margin-top: auto;
-  text-align: right;
-  font-weight: 600;
-}
-
-/* responsive cards */
-@media (max-width: 900px) {
-  .product-card {
-    width: 32%;
-  }
-}
-
-@media (max-width: 640px) {
-  .product-card {
-    width: 48%;
-  }
-}
-
-@media (max-width: 420px) {
-  .product-card {
-    width: 100%;
-  }
-}
-
-/* placeholder when image missing */
-.product-card .img-placeholder {
-  height: 150px;
+/* image */
+.product-img-wrapper {
+  height: 160px;
+  background: #f9f9f9;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f6f6f6;
-  color: #999;
+}
+
+.product-img-wrapper img {
+  max-height: 140px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* text area */
+.product-info {
+  padding: 10px;
+  text-align: center;
+}
+
+.product-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #212121;
+  line-height: 1.35;
+  height: 38px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.product-price {
+  font-size: 15px;
+  font-weight: 600;
+  color: #000;
+}
+
+/* ======================================================
+   PRODUCT DETAILS PAGE (CONFIRMED – 2nd pic jaisa)
+====================================================== */
+
+.product-details {
+  max-width: 900px;
+  margin: 40px auto;
+  background: #fff;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+}
+
+/* image */
+.details-img {
+  max-height: 320px;
+  width: 100%;
+  object-fit: contain;
+}
+
+/* title */
+.product-details h3 {
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+/* buttons – same width */
+.product-details .btn {
+  width: 200px;
+}
+
+/* buy button */
+.product-details .btn-warning {
+  background: #ff9f00;
+  border: none;
+  font-weight: 600;
+}
+
+/* ======================================================
+   CHECKOUT PAGE (NEW – MINIMAL)
+====================================================== */
+
+.checkout-box {
+  max-width: 500px;
+  margin: 40px auto;
+  background: #fff;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+}
+
+.checkout-box h3 {
+  font-weight: 600;
+  margin-bottom: 15px;
+}
+
+/* ======================================================
+   ORDER SUCCESS PAGE (NEW – CENTERED)
+====================================================== */
+
+.order-success {
+  max-width: 500px;
+  margin: 60px auto;
+  background: #fff;
+  padding: 30px;
+  border-radius: 8px;
+  text-align: center;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+}
+
+/* ======================================================
+   BUTTON VISIBILITY RULES (SAFE)
+====================================================== */
+
+/* catalog me buttons hide */
+#productCatalog .btn {
+  display: none;
+}
+
+/* details / checkout / order success me buttons show */
+.product-details .btn,
+.checkout-box .btn,
+.order-success .btn {
+  display: inline-block;
+}
+
+/* ======================
+   MY ORDERS TABLE
+====================== */
+
+.orders-table th {
+  background: #f1f1f1;
+  font-weight: 600;
+  text-align: center;
+}
+
+.orders-table td {
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+
+.orders-table td div {
+  line-height: 1.4;
+}
+
+.orders-table .badge {
+  font-size: 0.75rem;
+  padding: 6px 10px;
+}
+
+/* ---- Register ---- */
+.register-form {
+  padding-left: 10px;
+}
+
+.form-label-dark {
+  color: #111;
+  font-weight: 600;
   font-size: 0.95rem;
+}
+
+.register-input {
+  max-width: 260px;
+  background-color: #f6f6f6;
+}
+
+/* ======================
+   ADMIN DASHBOARD (PINK SECTION)
+====================== */
+
+.admin-dashboard-wrapper {
+  padding-top: 10px;
+  padding-bottom: 30px;
+}
+
+.admin-dashboard-box {
+  background: rgba(255, 192, 203, 0.35); /* light pink */
+  padding: 25px;
+  border-radius: 8px;
+}
+
+/* badges spacing */
+.admin-dashboard-box .badge {
+  font-size: 0.75rem;
+  padding: 6px 10px;
 }
