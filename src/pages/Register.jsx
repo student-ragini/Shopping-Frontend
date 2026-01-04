@@ -26,29 +26,31 @@ export default function Register() {
     });
   };
 
-  const handleRegister = async () => {
-    try {
-      const res = await fetch("http://localhost:4400/customerregister", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(form),
-      });
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-      const data = await res.json();
+const handleRegister = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/customerregister`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(form),
+    });
 
-      if (data.success) {
-        alert("✅ Registration Successful");
-        navigate("/login");
-      } else {
-        alert("❌ User already exists");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("❌ Server error");
+    const data = await res.json();
+
+    if (data.success) {
+      alert("✅ Registration Successful");
+      navigate("/login");
+    } else {
+      alert("❌ User already exists");
     }
-  };
+  } catch (err) {
+    console.error(err);
+    alert("❌ Server error");
+  }
+};
 
   return (
     <div className="row">

@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export default function Profile() {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch(`http://localhost:4400/customers/${user}`)
+    fetch(`${API_BASE_URL}/customers/${user}`)
       .then((res) => res.json())
       .then((data) => setProfile(data.customer));
   }, [user]);
@@ -17,40 +19,39 @@ export default function Profile() {
   };
 
   const handleUpdate = async () => {
-  setSaving(true);
+    setSaving(true);
 
-  const payload = {
-    FirstName: profile.FirstName,
-    LastName: profile.LastName,
-    Email: profile.Email,
-    Mobile: profile.Mobile,
-    Gender: profile.Gender,
-    Address: profile.Address,
-    PostalCode: profile.PostalCode,
-    State: profile.State,
-    Country: profile.Country,
-  };
+    const payload = {
+      FirstName: profile.FirstName,
+      LastName: profile.LastName,
+      Email: profile.Email,
+      Mobile: profile.Mobile,
+      Gender: profile.Gender,
+      Address: profile.Address,
+      PostalCode: profile.PostalCode,
+      State: profile.State,
+      Country: profile.Country,
+    };
 
-  
-  if (profile.Password && profile.Password.trim() !== "") {
-    payload.Password = profile.Password;
-  }
-
-  const res = await fetch(
-    `http://localhost:4400/customers/${profile.UserId}`,
-    {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    if (profile.Password && profile.Password.trim() !== "") {
+      payload.Password = profile.Password;
     }
-  );
 
-  const data = await res.json();
-  setProfile(data.customer);
-  setSaving(false);
+    const res = await fetch(
+      `${API_BASE_URL}/customers/${profile.UserId}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
 
-  alert("Profile updated successfully");
-};
+    const data = await res.json();
+    setProfile(data.customer);
+    setSaving(false);
+
+    alert("Profile updated successfully");
+  };
 
   if (!profile) return null;
 

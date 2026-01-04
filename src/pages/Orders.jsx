@@ -3,6 +3,8 @@ import { useAuth } from "../context/AuthContext";
 import { api } from "../api/api";
 import { useNavigate } from "react-router-dom";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export default function Orders() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -37,7 +39,7 @@ export default function Orders() {
     if (!ok) return;
 
     try {
-      await fetch(`http://localhost:4400/orders/${orderId}/status`, {
+      await fetch(`${API_BASE_URL}/orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "Cancelled" }),
@@ -146,7 +148,7 @@ export default function Orders() {
                   </td>
 
                   <td>
-                    {/* ===== VIEW ===== */}
+                    {/* VIEW */}
                     <button
                       className="btn btn-sm btn-outline-primary me-2"
                       onClick={() =>
@@ -156,7 +158,7 @@ export default function Orders() {
                       View
                     </button>
 
-                    {/* ===== CANCEL ===== */}
+                    {/* CANCEL */}
                     {order.status === "Created" && (
                       <button
                         className="btn btn-sm btn-outline-danger"
