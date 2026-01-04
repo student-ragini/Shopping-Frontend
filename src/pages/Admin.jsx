@@ -28,10 +28,10 @@ export default function Admin() {
       return;
     }
 
-    // ✅ SAVE ADMIN IN CONTEXT
+    //  SAVE ADMIN IN CONTEXT
     loginAdmin({ username: res.username });
 
-    // ✅ GO TO ADMIN DASHBOARD (NOT HOME)
+    //  GO TO ADMIN DASHBOARD 
     navigate("/admin-dashboard");
   };
 

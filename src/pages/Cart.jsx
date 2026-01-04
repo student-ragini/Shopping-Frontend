@@ -22,7 +22,7 @@ export default function Cart() {
         `You are about to place an order for ₹${totalAmount}. Proceed?`
       )
     ) {
-      // ✅ replace:true is THE KEY
+      //  replace:true is THE KEY
       navigate("/checkout", { replace: true });
     }
   };

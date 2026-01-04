@@ -49,9 +49,7 @@ footer .footer-link:hover {
   white-space: nowrap;
 }
 
-/* ======================================================
-   PRODUCT CATALOG (2nd pic jaisa – OK)
-====================================================== */
+/* ============ PRODUCT CATALOG ============== */
 
 #productCatalog {
   display: grid;
@@ -113,9 +111,7 @@ footer .footer-link:hover {
   color: #000;
 }
 
-/* ======================================================
-   PRODUCT DETAILS PAGE (CONFIRMED – 2nd pic jaisa)
-====================================================== */
+/* ========= PRODUCT DETAILS PAGE =========== */
 
 .product-details {
   max-width: 900px;
@@ -151,9 +147,7 @@ footer .footer-link:hover {
   font-weight: 600;
 }
 
-/* ======================================================
-   CHECKOUT PAGE (NEW – MINIMAL)
-====================================================== */
+/* ================ CHECKOUT PAGE ================ */
 
 .checkout-box {
   max-width: 500px;
@@ -169,9 +163,7 @@ footer .footer-link:hover {
   margin-bottom: 15px;
 }
 
-/* ======================================================
-   ORDER SUCCESS PAGE (NEW – CENTERED)
-====================================================== */
+/* =============== ORDER SUCCESS PAGE (NEW – CENTERED) ============== */
 
 .order-success {
   max-width: 500px;
@@ -183,9 +175,7 @@ footer .footer-link:hover {
   box-shadow: 0 6px 24px rgba(0,0,0,0.12);
 }
 
-/* ======================================================
-   BUTTON VISIBILITY RULES (SAFE)
-====================================================== */
+/* ============== BUTTON VISIBILITY RULES (SAFE) ============== */
 
 /* catalog me buttons hide */
 #productCatalog .btn {
@@ -199,9 +189,7 @@ footer .footer-link:hover {
   display: inline-block;
 }
 
-/* ======================
-   MY ORDERS TABLE
-====================== */
+/* ============== MY ORDERS TABLE ============== */
 
 .orders-table th {
   background: #f1f1f1;
@@ -239,9 +227,7 @@ footer .footer-link:hover {
   background-color: #f6f6f6;
 }
 
-/* ======================
-   ADMIN DASHBOARD (PINK SECTION)
-====================== */
+/* ================== ADMIN DASHBOARD =================== */
 
 .admin-dashboard-wrapper {
   padding-top: 10px;
@@ -249,7 +235,7 @@ footer .footer-link:hover {
 }
 
 .admin-dashboard-box {
-  background: rgba(255, 192, 203, 0.35); /* light pink */
+  background: rgba(255, 192, 203, 0.35); 
   padding: 25px;
   border-radius: 8px;
 }

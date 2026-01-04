@@ -31,7 +31,7 @@ export default function Profile() {
     Country: profile.Country,
   };
 
-  // password sirf tab bhejo jab user ne likha ho
+  
   if (profile.Password && profile.Password.trim() !== "") {
     payload.Password = profile.Password;
   }

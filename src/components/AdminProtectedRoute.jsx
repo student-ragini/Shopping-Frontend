@@ -5,7 +5,7 @@ export default function AdminProtectedRoute({ children }) {
   const { admin } = useAdminAuth();
 
   if (!admin) {
-    return <Navigate to="/admin" />; // ✅ FIX
+    return <Navigate to="/admin" />; 
   }
 
   return children;

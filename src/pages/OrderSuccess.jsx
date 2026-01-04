@@ -7,7 +7,6 @@ export default function OrderSuccess() {
   const { orderId, total } = location.state || {};
 
   if (!orderId) {
-    // direct URL access se bachane ke liye
     navigate("/products", { replace: true });
     return null;
   }

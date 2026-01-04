@@ -29,7 +29,7 @@ export const api = {
     return res.json();
   },
 
-  // ✅ ADD THIS (VERY IMPORTANT)
+  
   getOrders: async (userId) => {
     const res = await fetch(`${API_BASE_URL}/orders/${userId}`);
     return res.json();
@@ -60,7 +60,7 @@ updateOrderStatus: async (orderId, status) => {
   return res.json();
 },
 
-// ⭐ RATING APIs
+//  RATING APIs
 rateProduct: async (productId, data) => {
   const res = await fetch(`${API_BASE_URL}/products/${productId}/rate`, {
     method: "POST",
