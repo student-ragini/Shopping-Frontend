@@ -47,7 +47,6 @@ export default function AdminDashboard() {
   return (
     <div className="admin-dashboard-wrapper">
       <div className="admin-dashboard-box">
-        {/* HEADER */}
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h3 className="fw-bold">Admin Dashboard</h3>
 
@@ -81,7 +80,6 @@ export default function AdminDashboard() {
           </select>
         </div>
 
-        {/* TABLE */}
         <div className="table-responsive">
           <table className="table table-bordered align-middle">
             <thead className="table-light">

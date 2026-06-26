@@ -14,7 +14,7 @@ export default function Products() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("");
 
-  // 🔐 Login check
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }

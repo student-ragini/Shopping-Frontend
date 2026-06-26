@@ -33,7 +33,7 @@ export default function Orders() {
     if (user) loadOrders();
   }, [user]);
 
-  /* ================= CANCEL ORDER ================= */
+
   const cancelOrder = async (orderId) => {
     const ok = window.confirm("Are you sure you want to cancel this order?");
     if (!ok) return;
@@ -58,7 +58,6 @@ export default function Orders() {
     }
   };
 
-  /* ================= FILTER ================= */
   const filteredOrders =
     filter === "All"
       ? orders
@@ -70,7 +69,6 @@ export default function Orders() {
 
   return (
     <div className="container mt-5">
-      {/* ===== HEADER + FILTER ===== */}
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h3>My Orders</h3>
 
@@ -91,7 +89,6 @@ export default function Orders() {
         </div>
       </div>
 
-      {/* ===== TABLE ===== */}
       {filteredOrders.length === 0 ? (
         <p>No orders found.</p>
       ) : (
@@ -148,7 +145,6 @@ export default function Orders() {
                   </td>
 
                   <td>
-                    {/* VIEW */}
                     <button
                       className="btn btn-sm btn-outline-primary me-2"
                       onClick={() =>
@@ -158,7 +154,6 @@ export default function Orders() {
                       View
                     </button>
 
-                    {/* CANCEL */}
                     {order.status === "Created" && (
                       <button
                         className="btn btn-sm btn-outline-danger"

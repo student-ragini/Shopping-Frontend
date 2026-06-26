@@ -9,7 +9,6 @@ export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Buy Now OR Cart
   const items = location.state?.buyNow
   ? [{ ...location.state.buyNow, qty: location.state.buyNow.qty || 1 }]
   : cart;

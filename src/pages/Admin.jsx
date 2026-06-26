@@ -28,16 +28,12 @@ export default function Admin() {
       return;
     }
 
-    //  SAVE ADMIN IN CONTEXT
     loginAdmin({ username: res.username });
-
-    //  GO TO ADMIN DASHBOARD 
     navigate("/admin-dashboard");
   };
 
   return (
     <div className="row">
-      {/* LEFT ADMIN LOGIN FORM */}
       <div className="col-md-5 register-form">
         <h3 className="mb-4 fw-bold text-dark">Admin Login</h3>
 
@@ -68,8 +64,6 @@ export default function Admin() {
           {loading ? "Logging in..." : "Login"}
         </button>
       </div>
-
-      {/* RIGHT EMPTY (background image visible) */}
       <div className="col-md-7"></div>
     </div>
   );

@@ -27,12 +27,10 @@ export default function App() {
 
       <main className="container my-4 min-vh-60">
         <Routes>
-          {/* PUBLIC ROUTES */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* USER PROTECTED ROUTES */}
           <Route
             path="/products"
             element={
@@ -106,11 +104,9 @@ export default function App() {
             }
           />
 
-          {/* ADMIN ROUTES */}
-          {/* Admin Login (NO protection) */}
+          
           <Route path="/admin" element={<Admin />} />
 
-          {/* Admin Dashboard (PROTECTED) */}
           <Route
             path="/admin-dashboard"
             element={

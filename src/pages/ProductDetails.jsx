@@ -44,12 +44,12 @@ export default function ProductDetails() {
           <h3>{product.title}</h3>
           <h4 className="text-success">₹{product.price}</h4>
 
-          {/* ⭐ RATING DISPLAY */}
+      
           <div className="mb-2">
             <strong>{rating.avg}</strong> ⭐ ({rating.count} reviews)
           </div>
 
-          {/* ⭐ RATE PRODUCT */}
+      
           <div className="mb-3">
            {[1, 2, 3, 4, 5].map((n) => (
             <span

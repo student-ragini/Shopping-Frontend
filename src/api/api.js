@@ -60,7 +60,6 @@ updateOrderStatus: async (orderId, status) => {
   return res.json();
 },
 
-//  RATING APIs
 rateProduct: async (productId, data) => {
   const res = await fetch(`${API_BASE_URL}/products/${productId}/rate`, {
     method: "POST",
