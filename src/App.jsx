@@ -12,6 +12,7 @@ import Orders from "./pages/Orders";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminRegister from "./pages/AdminRegister";
 import ProductDetails from "./pages/ProductDetails";
 import Checkout from "./pages/Checkout";
 import OrderSuccess from "./pages/OrderSuccess";
@@ -30,91 +31,18 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-
-          <Route
-            path="/products"
-            element={
-              <ProtectedRoute>
-                <Products />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/products/:id"
-            element={
-              <ProtectedRoute>
-                <ProductDetails />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/categories"
-            element={
-              <ProtectedRoute>
-                <Categories />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/cart"
-            element={
-              <ProtectedRoute>
-                <Cart />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/checkout"
-            element={
-              <ProtectedRoute>
-                <Checkout />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/order-success"
-            element={
-              <ProtectedRoute>
-                <OrderSuccess />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/orders"
-            element={
-              <ProtectedRoute>
-                <Orders />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/orders/:orderId"
-            element={
-              <ProtectedRoute>
-                <OrderDetails />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
-
-          
+          <Route path="/products" element={<ProtectedRoute><Products /> </ProtectedRoute>} />
+          <Route path="/products/:id" element={<ProtectedRoute><ProductDetails /> </ProtectedRoute>} />
+          <Route path="/categories" element={<ProtectedRoute> <Categories /></ProtectedRoute> } />
+          <Route path="/cart" element={ <ProtectedRoute> <Cart /></ProtectedRoute> } />
+          <Route path="/checkout" element={<ProtectedRoute> <Checkout /> </ProtectedRoute>} />
+          <Route path="/order-success" element={<ProtectedRoute> <OrderSuccess /></ProtectedRoute>} />
+          <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute> } />
+          <Route path="/orders/:orderId" element={<ProtectedRoute> <OrderDetails /></ProtectedRoute> } />
+          <Route path="/profile" element={<ProtectedRoute><Profile /> </ProtectedRoute>}/>
           <Route path="/admin" element={<Admin />} />
-
-          <Route
-            path="/admin-dashboard"
-            element={
-              <AdminProtectedRoute>
-                <AdminDashboard />
-              </AdminProtectedRoute>
-            }
-          />
+          <Route path="/admin-register" element= {<AdminRegister/>} />
+          <Route path="/admin-dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute> } />
         </Routes>
       </main>
 

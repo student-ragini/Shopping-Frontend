@@ -63,6 +63,14 @@ export default function Admin() {
         >
           {loading ? "Logging in..." : "Login"}
         </button>
+        <p className="mt-3">
+  <span
+    style={{ cursor: "pointer", color: "blue", textDecoration: "underline" }}
+    onClick={() => navigate("/admin-register")}
+  >
+    Create New Admin Account
+  </span>
+</p>
       </div>
       <div className="col-md-7"></div>
     </div>
