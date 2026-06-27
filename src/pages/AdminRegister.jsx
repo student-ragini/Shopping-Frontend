@@ -8,10 +8,12 @@ export default function AdminRegister() {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [email,    setEmail]  = useState("");
 
   const handleRegister = async () => {
-    if (!username || !password) {
-      alert("Username & Password required");
+    if (!username || !fullName || !email || !password) {
+      alert("All fields are  required");
       return;
     }
 
@@ -20,7 +22,7 @@ export default function AdminRegister() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, fullName, email, password }),
     });
 
     const data = await res.json();
@@ -44,6 +46,21 @@ export default function AdminRegister() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
         />
+
+        <input
+  className="form-control register-input mb-3"
+  placeholder="Full Name"
+  value={fullName}
+  onChange={(e) => setFullName(e.target.value)}
+/>
+
+<input
+  type="email"
+  className="form-control register-input mb-3"
+  placeholder="Email"
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+/>
 
         <input
           type="password"
